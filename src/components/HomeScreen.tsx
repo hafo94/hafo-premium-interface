@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Film, Tv, Gamepad2, Monitor, Music, Youtube, ChevronDown, Wifi, Settings, LogOut, Users, LucideIcon } from "lucide-react";
+import { ChevronDown, Wifi, Settings, LogOut, Users, Menu } from "lucide-react";
 import breakingBadHeader from "@/assets/breaking_bad_header.png";
 import eldenRingHeader from "@/assets/elden_ring_header.png";
 import chillVibesHeader from "@/assets/chill_vibes_header.png";
@@ -16,8 +16,9 @@ import rgHollowKnight from "@/assets/rg_hollowknight.png";
 import AnimatedBackground from "./AnimatedBackground";
 import ContentCarousel from "./ContentCarousel";
 import FeaturedHero from "./FeaturedHero";
-import AppTile from "./AppTile";
+import AppSidebar from "./AppSidebar";
 import SettingsModal from "./SettingsModal";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,16 +38,6 @@ interface HomeScreenProps {
   onLogout: () => void;
 }
 
-interface AppTileData {
-  id: string;
-  name: string;
-  icon: LucideIcon;
-  color: string;
-  glowClass: string;
-  bgGradient: string;
-  badge?: string;
-}
-
 interface FeaturedContent {
   type: "game" | "series" | "music";
   title: string;
@@ -55,58 +46,6 @@ interface FeaturedContent {
   accentColor: string;
   image: string;
 }
-
-const apps: AppTileData[] = [
-  {
-    id: "nipflix",
-    name: "Nipflix",
-    icon: Film,
-    color: "text-nipflix",
-    glowClass: "glow-nipflix",
-    bgGradient: "from-nipflix/25 to-nipflix/5",
-    badge: "New",
-  },
-  {
-    id: "youtube",
-    name: "YouTube",
-    icon: Youtube,
-    color: "text-youtube",
-    glowClass: "glow-youtube",
-    bgGradient: "from-youtube/25 to-youtube/5",
-  },
-  {
-    id: "tv",
-    name: "TV",
-    icon: Tv,
-    color: "text-tv",
-    glowClass: "glow-tv",
-    bgGradient: "from-tv/25 to-tv/5",
-  },
-  {
-    id: "retro",
-    name: "Retro Gaming",
-    icon: Gamepad2,
-    color: "text-retro",
-    glowClass: "glow-retro",
-    bgGradient: "from-retro/25 to-retro/5",
-  },
-  {
-    id: "steam",
-    name: "Steam Link",
-    icon: Monitor,
-    color: "text-steam",
-    glowClass: "glow-steam",
-    bgGradient: "from-steam/25 to-steam/5",
-  },
-  {
-    id: "spotify",
-    name: "Spotify",
-    icon: Music,
-    color: "text-spotify",
-    glowClass: "glow-spotify",
-    bgGradient: "from-spotify/25 to-spotify/5",
-  },
-];
 
 const featuredContent: FeaturedContent[] = [
   {
@@ -195,137 +134,125 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
     : featured.accentColor.replace("text-", "--");
 
   return (
-    <div
-      className={`min-h-screen flex flex-col transition-opacity duration-500 ${
-        isVisible ? "opacity-100" : "opacity-0"
-      }`}
-    >
-      {/* Animated Background */}
-      <AnimatedBackground accentColor={activeAccentColor} />
-      
-      {/* Header */}
-      <header className="relative flex items-center justify-between px-8 md:px-16 py-6 animate-fade-in-scale z-10">
-        {/* Logo - Left Side */}
-        <div className="flex items-center">
-          <h1 className="text-2xl font-light tracking-[0.35em] text-gradient animate-breathe text-shadow-lg">
-            hafo
-          </h1>
-        </div>
+    <SidebarProvider defaultOpen={true}>
+      <div
+        className={`min-h-screen flex w-full transition-opacity duration-500 ${
+          isVisible ? "opacity-100" : "opacity-0"
+        }`}
+      >
+        {/* Animated Background */}
+        <AnimatedBackground accentColor={activeAccentColor} />
         
-        {/* Right Side - Status + Time/Date + Profile */}
-        <div className="flex items-center gap-5">
-          {/* Status Indicators */}
-          <div className="flex items-center gap-3 text-foreground/40">
-            <Wifi className="w-4 h-4" strokeWidth={1.5} />
-            <Settings className="w-4 h-4 hover:text-foreground/60 cursor-pointer transition-colors" strokeWidth={1.5} />
-          </div>
+        {/* App Sidebar */}
+        <AppSidebar onAppHover={setHoveredApp} hoveredApp={hoveredApp} />
 
-          {/* Subtle Divider */}
-          <div className="h-5 w-px bg-border/30 hidden sm:block" />
-
-          {/* Discrete Time/Date Display */}
-          <div className="text-right hidden sm:block">
-            <div className="text-lg font-normal tracking-wide text-foreground/70 tabular-nums">
-              {formatTime(currentTime)}
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-h-screen relative z-10">
+          {/* Header */}
+          <header className="relative flex items-center justify-between px-6 md:px-12 py-6 animate-fade-in-scale">
+            {/* Mobile Sidebar Trigger */}
+            <div className="md:hidden">
+              <SidebarTrigger className="text-foreground/60 hover:text-foreground" />
             </div>
-            <div className="text-xs font-normal text-foreground/40 tracking-wider">
-              {formatDate(currentTime)}
-            </div>
-          </div>
+            
+            {/* Spacer for desktop */}
+            <div className="hidden md:block" />
+            
+            {/* Right Side - Status + Time/Date + Profile */}
+            <div className="flex items-center gap-5">
+              {/* Status Indicators */}
+              <div className="flex items-center gap-3 text-foreground/40">
+                <Wifi className="w-4 h-4" strokeWidth={1.5} />
+                <Settings className="w-4 h-4 hover:text-foreground/60 cursor-pointer transition-colors" strokeWidth={1.5} onClick={() => setSettingsOpen(true)} />
+              </div>
 
-          {/* Profile Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                className="flex items-center gap-3 px-4 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:ring-2 hover:ring-foreground/10 focus:outline-none"
-              >
-                {/* Avatar Circle */}
-                <div 
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white/90 shadow-lg"
-                  style={{ backgroundColor: profile.avatar }}
-                >
-                  {profile.name.charAt(0).toUpperCase()}
+              {/* Subtle Divider */}
+              <div className="h-5 w-px bg-border/30 hidden sm:block" />
+
+              {/* Discrete Time/Date Display */}
+              <div className="text-right hidden sm:block">
+                <div className="text-lg font-normal tracking-wide text-foreground/70 tabular-nums">
+                  {formatTime(currentTime)}
                 </div>
-                <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal">
-                  {profile.name}
-                </span>
-                <ChevronDown className="w-4 h-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" strokeWidth={1.5} />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 bg-card/95 backdrop-blur-xl border-border/50">
-              <DropdownMenuItem onClick={() => setSettingsOpen(true)} className="cursor-pointer gap-2">
-                <Settings className="w-4 h-4" strokeWidth={1.5} />
-                <span>Settings</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer gap-2">
-                <Users className="w-4 h-4" strokeWidth={1.5} />
-                <span>Switch Profile</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-2 text-destructive focus:text-destructive">
-                <LogOut className="w-4 h-4" strokeWidth={1.5} />
-                <span>Logout</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </header>
+                <div className="text-xs font-normal text-foreground/40 tracking-wider">
+                  {formatDate(currentTime)}
+                </div>
+              </div>
 
-      {/* Header Separator */}
-      <div className="header-separator mx-8 md:mx-16" />
+              {/* Profile Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="flex items-center gap-3 px-4 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:ring-2 hover:ring-foreground/10 focus:outline-none"
+                  >
+                    {/* Avatar Circle */}
+                    <div 
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white/90 shadow-lg"
+                      style={{ backgroundColor: profile.avatar }}
+                    >
+                      {profile.name.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal hidden sm:inline">
+                      {profile.name}
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" strokeWidth={1.5} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48 bg-card/95 backdrop-blur-xl border-border/50">
+                  <DropdownMenuItem onClick={() => setSettingsOpen(true)} className="cursor-pointer gap-2">
+                    <Settings className="w-4 h-4" strokeWidth={1.5} />
+                    <span>Settings</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="cursor-pointer gap-2">
+                    <Users className="w-4 h-4" strokeWidth={1.5} />
+                    <span>Switch Profile</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-2 text-destructive focus:text-destructive">
+                    <LogOut className="w-4 h-4" strokeWidth={1.5} />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </header>
 
-      {/* Main Content */}
-      <main className="relative flex-1 flex flex-col px-8 md:px-16 pb-8 z-10 overflow-hidden">
-        {/* Featured Content Hero */}
-        <div className="mb-6 md:mb-8 animate-fade-in-scale" style={{ animationDelay: "0.1s" }}>
-          <FeaturedHero 
-            content={featured}
-            allContent={featuredContent}
-            currentIndex={featuredIndex}
-            onIndexChange={setFeaturedIndex}
-          />
-        </div>
+          {/* Header Separator */}
+          <div className="header-separator mx-6 md:mx-12" />
 
-        {/* Content Carousels */}
-        <div className="space-y-6 mb-8 animate-fade-in-scale" style={{ animationDelay: "0.2s" }}>
-          <ContentCarousel title="Continue Watching" items={continueWatchingItems} />
-          <ContentCarousel title="Recent Games" items={recentGamesItems} />
-        </div>
-
-        {/* Apps Section */}
-        <div className="mt-auto">
-          <h3 className="text-sm font-medium text-foreground/60 uppercase tracking-widest mb-4 animate-fade-in-scale" style={{ animationDelay: "0.3s" }}>
-            Your Apps
-          </h3>
-          
-          {/* Apps Grid */}
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-5">
-            {apps.map((app, index) => (
-              <AppTile
-                key={app.id}
-                {...app}
-                index={index}
-                isHovered={hoveredApp === app.id}
-                isOtherHovered={hoveredApp !== null && hoveredApp !== app.id}
-                onHover={setHoveredApp}
+          {/* Main Content */}
+          <main className="relative flex-1 flex flex-col px-6 md:px-12 pb-8 overflow-hidden">
+            {/* Featured Content Hero */}
+            <div className="mb-6 md:mb-8 animate-fade-in-scale" style={{ animationDelay: "0.1s" }}>
+              <FeaturedHero 
+                content={featured}
+                allContent={featuredContent}
+                currentIndex={featuredIndex}
+                onIndexChange={setFeaturedIndex}
               />
-            ))}
-          </div>
-        </div>
-      </main>
+            </div>
 
-      {/* Footer */}
-      <footer className="relative z-10 px-8 md:px-16 py-4">
-        <div className="flex items-center justify-between text-xs text-foreground/30">
-          <span className="font-normal tracking-wider">hafo media hub</span>
-          <div className="h-px w-24 bg-gradient-to-r from-transparent via-border to-transparent" />
-          <span className="font-normal">v1.0</span>
-        </div>
-      </footer>
+            {/* Content Carousels */}
+            <div className="space-y-6 flex-1 animate-fade-in-scale" style={{ animationDelay: "0.2s" }}>
+              <ContentCarousel title="Continue Watching" items={continueWatchingItems} />
+              <ContentCarousel title="Recent Games" items={recentGamesItems} />
+            </div>
+          </main>
 
-      {/* Settings Modal */}
-      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
-    </div>
+          {/* Footer */}
+          <footer className="relative px-6 md:px-12 py-4">
+            <div className="flex items-center justify-between text-xs text-foreground/30">
+              <span className="font-normal tracking-wider">hafo media hub</span>
+              <div className="h-px w-24 bg-gradient-to-r from-transparent via-border to-transparent" />
+              <span className="font-normal">v1.0</span>
+            </div>
+          </footer>
+        </div>
+
+        {/* Settings Modal */}
+        <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+      </div>
+    </SidebarProvider>
   );
 };
 
