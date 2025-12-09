@@ -36,6 +36,7 @@
 
     /* App accent colors */
     --nipflix: 0 72% 51%;
+    --youtube: 0 100% 50%;
     --tv: 217 91% 60%;
     --retro: 271 81% 56%;
     --steam: 142 71% 45%;
@@ -90,6 +91,10 @@
 
   .glow-spotify {
     box-shadow: var(--shadow-glow) hsl(var(--spotify) / 0.4);
+  }
+
+  .glow-youtube {
+    box-shadow: var(--shadow-glow) hsl(var(--youtube) / 0.4);
   }
 }
 

@@ -48,6 +48,7 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
         nipflix: "hsl(var(--nipflix))",
+        youtube: "hsl(var(--youtube))",
         tv: "hsl(var(--tv))",
         retro: "hsl(var(--retro))",
         steam: "hsl(var(--steam))",
