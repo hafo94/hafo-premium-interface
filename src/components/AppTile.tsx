@@ -43,15 +43,24 @@ const AppTile = ({
     >
       <div
         className={`relative aspect-square rounded-2xl md:rounded-3xl overflow-hidden
-          border border-border/40 flex flex-col items-center justify-center gap-2 md:gap-4
-          transition-all duration-500 ease-out
-          ${isHovered ? `scale-110 ${glowClass} border-border/80` : ""}
+          flex flex-col items-center justify-center gap-2 md:gap-4
+          transition-all duration-500 ease-out tile-premium
+          ${isHovered ? `scale-110 ${glowClass}` : ""}
           ${isOtherHovered ? "opacity-40 scale-95" : ""}
           ${isPressed ? "scale-105" : ""}
         `}
+        style={{
+          transform: isHovered ? 'translateY(-4px)' : 'translateY(0)',
+        }}
       >
         {/* Background gradient */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${bgGradient} transition-opacity duration-500`} />
+        <div className={`absolute inset-0 bg-gradient-to-br ${bgGradient} transition-opacity duration-500 ${isHovered ? 'opacity-100' : 'opacity-60'}`} />
+        
+        {/* Top edge highlight */}
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
+        
+        {/* Inner glow at top */}
+        <div className={`absolute inset-x-0 top-0 h-1/2 bg-gradient-to-b from-white/5 to-transparent transition-opacity duration-500 ${isHovered ? 'opacity-100' : 'opacity-50'}`} />
         
         {/* Preview image (shows on hover for supported apps) */}
         {previewImage && (
@@ -68,20 +77,20 @@ const AppTile = ({
         {/* Animated background glow */}
         <div
           className={`absolute inset-0 rounded-2xl md:rounded-3xl bg-gradient-to-br ${bgGradient} blur-2xl 
-            transition-all duration-500 ${isHovered ? "opacity-60 scale-150" : "opacity-0 scale-100"}`}
+            transition-all duration-500 ${isHovered ? "opacity-70 scale-150" : "opacity-0 scale-100"}`}
         />
         
         {/* Focus ring animation */}
         <div
           className={`absolute inset-0 rounded-2xl md:rounded-3xl border-2 transition-all duration-300 ${
-            isHovered ? "border-foreground/20 scale-105" : "border-transparent scale-100"
+            isHovered ? "border-foreground/30 scale-105" : "border-transparent scale-100"
           }`}
         />
         
         {/* Badge */}
         {badge && (
           <div className="absolute top-2 right-2 z-20">
-            <div className={`px-2 py-0.5 rounded-full text-[10px] font-medium bg-foreground text-background`}>
+            <div className="px-2.5 py-1 rounded-full text-[10px] font-semibold bg-foreground text-background shadow-lg">
               {badge}
             </div>
           </div>
@@ -97,7 +106,7 @@ const AppTile = ({
           {/* Icon glow */}
           <div
             className={`absolute inset-0 blur-xl transition-opacity duration-500 ${
-              isHovered ? "opacity-60" : "opacity-0"
+              isHovered ? "opacity-70" : "opacity-0"
             }`}
           >
             <Icon className={`w-8 h-8 md:w-12 md:h-12 ${color}`} strokeWidth={1.2} />
@@ -106,15 +115,15 @@ const AppTile = ({
         
         {/* Name */}
         <span
-          className={`relative text-xs md:text-sm font-light tracking-wide transition-all duration-300
-            ${isHovered ? "text-foreground translate-y-0.5" : "text-muted-foreground"}`}
+          className={`relative text-xs md:text-sm font-normal tracking-wide transition-all duration-300
+            ${isHovered ? "text-foreground translate-y-0.5" : "text-foreground/70"}`}
         >
           {name}
         </span>
         
         {/* Shimmer effect on hover */}
         <div
-          className={`absolute inset-0 bg-gradient-to-r from-transparent via-foreground/5 to-transparent 
+          className={`absolute inset-0 bg-gradient-to-r from-transparent via-foreground/8 to-transparent 
             -translate-x-full transition-transform duration-700 ${isHovered ? "translate-x-full" : ""}`}
         />
       </div>
