@@ -26,13 +26,8 @@ const FeaturedHero = ({ content, allContent, currentIndex, onIndexChange }: Feat
           alt=""
           className="w-full h-full object-cover transition-transform duration-[2000ms] ease-out scale-105 hover:scale-100 brightness-110 contrast-105"
         />
-        {/* Multi-layer gradient overlay - enhanced for better visibility */}
-        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/90 to-background/40" />
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-background/60" />
-        <div className={`absolute inset-0 bg-gradient-to-br ${content.gradient} opacity-60`} />
-        
-        {/* Bottom reflection */}
-        <div className="absolute bottom-0 inset-x-0 h-24 bg-gradient-to-t from-background to-transparent" />
+        {/* Bottom reflection only - images have their own fade template */}
+        <div className="absolute bottom-0 inset-x-0 h-16 bg-gradient-to-t from-background to-transparent" />
       </div>
       
       {/* Animated glow */}
