@@ -151,9 +151,16 @@
     -ms-overflow-style: none;
     scrollbar-width: none;
   }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Header separator */
+.header-separator {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(var(--border) / 0.3), transparent);
+  margin-bottom: 1rem;
+}
 
   /* Premium tile effects */
   .tile-premium {
