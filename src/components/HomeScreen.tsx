@@ -4,6 +4,7 @@ import AnimatedBackground from "./AnimatedBackground";
 import ContentCarousel from "./ContentCarousel";
 import FeaturedHero from "./FeaturedHero";
 import AppTile from "./AppTile";
+import SettingsModal from "./SettingsModal";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -141,6 +142,7 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
   const [isVisible, setIsVisible] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -239,7 +241,7 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 bg-card/95 backdrop-blur-xl border-border/50">
-              <DropdownMenuItem className="cursor-pointer gap-2">
+              <DropdownMenuItem onClick={() => setSettingsOpen(true)} className="cursor-pointer gap-2">
                 <Settings className="w-4 h-4" strokeWidth={1.5} />
                 <span>Settings</span>
               </DropdownMenuItem>
@@ -308,6 +310,9 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
           <span className="font-normal">v1.0</span>
         </div>
       </footer>
+
+      {/* Settings Modal */}
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   );
 };
