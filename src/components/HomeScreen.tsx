@@ -3,6 +3,16 @@ import { Film, Tv, Gamepad2, Monitor, Music, Youtube, ChevronDown, Wifi, Setting
 import breakingBadHeader from "@/assets/breaking_bad_header.png";
 import eldenRingHeader from "@/assets/elden_ring_header.png";
 import chillVibesHeader from "@/assets/chill_vibes_header.png";
+// Continue Watching images
+import cwBreakingBad from "@/assets/cw_breakingbad.png";
+import cwDark from "@/assets/cw_dark.png";
+import cwStrangerThings from "@/assets/cw_strangerthings.png";
+import cwTheOffice from "@/assets/cw_theoffice.png";
+// Recent Games images
+import rgCyberpunk from "@/assets/rg_cyberpunk.png";
+import rgEldenRing from "@/assets/rg_eldenring.png";
+import rgHades from "@/assets/rg_hades.png";
+import rgHollowKnight from "@/assets/rg_hollowknight.png";
 import AnimatedBackground from "./AnimatedBackground";
 import ContentCarousel from "./ContentCarousel";
 import FeaturedHero from "./FeaturedHero";
@@ -126,18 +136,17 @@ const featuredContent: FeaturedContent[] = [
 ];
 
 const continueWatchingItems = [
-  { id: "1", title: "Breaking Bad", subtitle: "S5 E14", image: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&h=600&fit=crop", progress: 65, accentColor: "--nipflix" },
-  { id: "2", title: "The Office", subtitle: "S3 E12", image: "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=400&h=600&fit=crop", progress: 30, accentColor: "--nipflix" },
-  { id: "3", title: "Stranger Things", subtitle: "S4 E7", image: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=600&fit=crop", progress: 80, accentColor: "--nipflix" },
-  { id: "4", title: "Dark", subtitle: "S2 E5", image: "https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400&h=600&fit=crop", progress: 45, accentColor: "--nipflix" },
-  { id: "5", title: "Better Call Saul", subtitle: "S6 E3", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&h=600&fit=crop", progress: 15, accentColor: "--nipflix" },
+  { id: "1", title: "Breaking Bad", subtitle: "S5 E14", image: cwBreakingBad, progress: 65, accentColor: "--nipflix" },
+  { id: "2", title: "The Office", subtitle: "S3 E12", image: cwTheOffice, progress: 30, accentColor: "--nipflix" },
+  { id: "3", title: "Stranger Things", subtitle: "S4 E7", image: cwStrangerThings, progress: 80, accentColor: "--nipflix" },
+  { id: "4", title: "Dark", subtitle: "S2 E5", image: cwDark, progress: 45, accentColor: "--nipflix" },
 ];
 
 const recentGamesItems = [
-  { id: "1", title: "Elden Ring", subtitle: "47h played", image: "https://images.unsplash.com/photo-1552820728-8b83bb6b2b0b?w=400&h=600&fit=crop", accentColor: "--steam" },
-  { id: "2", title: "Cyberpunk 2077", subtitle: "23h played", image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=600&fit=crop", accentColor: "--steam" },
-  { id: "3", title: "Hades", subtitle: "89h played", image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&h=600&fit=crop", accentColor: "--retro" },
-  { id: "4", title: "Hollow Knight", subtitle: "34h played", image: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&h=600&fit=crop", accentColor: "--retro" },
+  { id: "1", title: "Elden Ring", subtitle: "47h played", image: rgEldenRing, accentColor: "--steam" },
+  { id: "2", title: "Cyberpunk 2077", subtitle: "23h played", image: rgCyberpunk, accentColor: "--steam" },
+  { id: "3", title: "Hades", subtitle: "89h played", image: rgHades, accentColor: "--retro" },
+  { id: "4", title: "Hollow Knight", subtitle: "34h played", image: rgHollowKnight, accentColor: "--retro" },
 ];
 
 const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
