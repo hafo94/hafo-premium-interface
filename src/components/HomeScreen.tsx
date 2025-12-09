@@ -42,7 +42,7 @@ const apps: AppTileData[] = [
     icon: Film,
     color: "text-nipflix",
     glowClass: "glow-nipflix",
-    bgGradient: "from-nipflix/20 to-nipflix/5",
+    bgGradient: "from-nipflix/25 to-nipflix/5",
     badge: "New",
   },
   {
@@ -51,7 +51,7 @@ const apps: AppTileData[] = [
     icon: Youtube,
     color: "text-youtube",
     glowClass: "glow-youtube",
-    bgGradient: "from-youtube/20 to-youtube/5",
+    bgGradient: "from-youtube/25 to-youtube/5",
   },
   {
     id: "tv",
@@ -59,7 +59,7 @@ const apps: AppTileData[] = [
     icon: Tv,
     color: "text-tv",
     glowClass: "glow-tv",
-    bgGradient: "from-tv/20 to-tv/5",
+    bgGradient: "from-tv/25 to-tv/5",
   },
   {
     id: "retro",
@@ -67,7 +67,7 @@ const apps: AppTileData[] = [
     icon: Gamepad2,
     color: "text-retro",
     glowClass: "glow-retro",
-    bgGradient: "from-retro/20 to-retro/5",
+    bgGradient: "from-retro/25 to-retro/5",
   },
   {
     id: "steam",
@@ -75,7 +75,7 @@ const apps: AppTileData[] = [
     icon: Monitor,
     color: "text-steam",
     glowClass: "glow-steam",
-    bgGradient: "from-steam/20 to-steam/5",
+    bgGradient: "from-steam/25 to-steam/5",
   },
   {
     id: "spotify",
@@ -83,7 +83,7 @@ const apps: AppTileData[] = [
     icon: Music,
     color: "text-spotify",
     glowClass: "glow-spotify",
-    bgGradient: "from-spotify/20 to-spotify/5",
+    bgGradient: "from-spotify/25 to-spotify/5",
   },
 ];
 
@@ -92,7 +92,7 @@ const featuredContent: FeaturedContent[] = [
     type: "series",
     title: "Continue Watching",
     subtitle: "Breaking Bad",
-    gradient: "from-nipflix/30 via-nipflix/10 to-transparent",
+    gradient: "from-nipflix/40 via-nipflix/15 to-transparent",
     accentColor: "text-nipflix",
     image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&h=600&fit=crop",
   },
@@ -100,7 +100,7 @@ const featuredContent: FeaturedContent[] = [
     type: "game",
     title: "Last Played",
     subtitle: "Elden Ring",
-    gradient: "from-steam/30 via-steam/10 to-transparent",
+    gradient: "from-steam/40 via-steam/15 to-transparent",
     accentColor: "text-steam",
     image: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=1200&h=600&fit=crop",
   },
@@ -108,7 +108,7 @@ const featuredContent: FeaturedContent[] = [
     type: "music",
     title: "Now Playing",
     subtitle: "Chill Vibes",
-    gradient: "from-spotify/30 via-spotify/10 to-transparent",
+    gradient: "from-spotify/40 via-spotify/15 to-transparent",
     accentColor: "text-spotify",
     image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200&h=600&fit=crop",
   },
@@ -185,27 +185,27 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
       {/* Header */}
       <header className="relative flex items-center justify-between px-8 md:px-16 py-6 animate-fade-in-scale z-10">
         <div className="flex items-center gap-8">
-          <h1 className="text-2xl font-extralight tracking-[0.2em] text-gradient animate-breathe">hafo</h1>
+          <h1 className="text-2xl font-light tracking-[0.3em] text-gradient animate-breathe">hafo</h1>
         </div>
         
         {/* Time Display */}
         <div className="absolute left-1/2 -translate-x-1/2 text-center">
-          <div className="text-4xl md:text-6xl font-extralight tracking-wider text-foreground tabular-nums">
+          <div className="text-4xl md:text-6xl font-light tracking-wider text-foreground tabular-nums text-shadow-lg">
             {formatTime(currentTime)}
           </div>
-          <div className="text-sm font-light text-muted-foreground tracking-wide mt-1">
+          <div className="text-sm font-normal text-muted-foreground tracking-wide mt-1">
             {formatDate(currentTime)}
           </div>
         </div>
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-2 rounded-full glass hover:bg-secondary/60 transition-all duration-300 group hover:scale-105"
+          className="flex items-center gap-3 px-5 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:scale-105"
         >
-          <span className="text-muted-foreground group-hover:text-foreground transition-colors font-light">
+          <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal">
             {profile.name}
           </span>
-          <LogOut className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" strokeWidth={1.5} />
+          <LogOut className="w-4 h-4 text-foreground/60 group-hover:text-foreground transition-colors" strokeWidth={1.5} />
         </button>
       </header>
 
@@ -229,7 +229,7 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
 
         {/* Apps Section */}
         <div className="mt-auto">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-4 animate-fade-in-scale" style={{ animationDelay: "0.3s" }}>
+          <h3 className="text-sm font-medium text-foreground/60 uppercase tracking-widest mb-4 animate-fade-in-scale" style={{ animationDelay: "0.3s" }}>
             Your Apps
           </h3>
           
@@ -251,10 +251,10 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
 
       {/* Footer */}
       <footer className="relative z-10 px-8 md:px-16 py-4">
-        <div className="flex items-center justify-between text-xs text-muted-foreground/40">
-          <span className="font-light tracking-wider">hafo media hub</span>
-          <div className="h-px w-24 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
-          <span className="font-light">v1.0</span>
+        <div className="flex items-center justify-between text-xs text-foreground/30">
+          <span className="font-normal tracking-wider">hafo media hub</span>
+          <div className="h-px w-24 bg-gradient-to-r from-transparent via-border to-transparent" />
+          <span className="font-normal">v1.0</span>
         </div>
       </footer>
     </div>

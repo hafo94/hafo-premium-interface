@@ -31,22 +31,26 @@ const ContentCarousel = ({ title, items }: ContentCarouselProps) => {
 
   return (
     <div className="relative group/carousel">
-      <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-4 px-1">
+      <h3 className="text-sm font-medium text-foreground/60 uppercase tracking-widest mb-4 px-1">
         {title}
       </h3>
       
       {/* Navigation Arrows */}
       <button
         onClick={() => scroll("left")}
-        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-24 flex items-center justify-center bg-gradient-to-r from-background via-background/80 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-300"
+        className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-14 h-28 flex items-center justify-center bg-gradient-to-r from-background via-background/90 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-300"
       >
-        <ChevronLeft className="w-6 h-6 text-foreground" strokeWidth={1.5} />
+        <div className="w-10 h-10 rounded-full glass-premium flex items-center justify-center">
+          <ChevronLeft className="w-5 h-5 text-foreground" strokeWidth={1.5} />
+        </div>
       </button>
       <button
         onClick={() => scroll("right")}
-        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-24 flex items-center justify-center bg-gradient-to-l from-background via-background/80 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-300"
+        className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-14 h-28 flex items-center justify-center bg-gradient-to-l from-background via-background/90 to-transparent opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-300"
       >
-        <ChevronRight className="w-6 h-6 text-foreground" strokeWidth={1.5} />
+        <div className="w-10 h-10 rounded-full glass-premium flex items-center justify-center">
+          <ChevronRight className="w-5 h-5 text-foreground" strokeWidth={1.5} />
+        </div>
       </button>
 
       {/* Scrollable Content */}
@@ -67,16 +71,27 @@ const ContentCarousel = ({ title, items }: ContentCarouselProps) => {
               className={`relative aspect-[2/3] rounded-xl overflow-hidden transition-all duration-500 ease-out ${
                 hoveredItem === item.id ? "scale-105 z-10" : ""
               } ${hoveredItem && hoveredItem !== item.id ? "opacity-50 scale-95" : ""}`}
+              style={{
+                boxShadow: hoveredItem === item.id 
+                  ? `0 20px 50px -15px hsl(0 0% 0% / 0.6), 0 0 40px -10px hsl(var(${item.accentColor}) / 0.3)`
+                  : '0 10px 30px -10px hsl(0 0% 0% / 0.4)',
+              }}
             >
               {/* Image */}
               <img
                 src={item.image}
                 alt={item.title}
-                className="absolute inset-0 w-full h-full object-cover"
+                className="absolute inset-0 w-full h-full object-cover brightness-105"
               />
               
+              {/* Top edge highlight */}
+              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
+              
               {/* Gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-background via-background/30 to-transparent" />
+              
+              {/* Border */}
+              <div className="absolute inset-0 rounded-xl border border-white/10" />
               
               {/* Glow effect on hover */}
               <div
@@ -84,7 +99,7 @@ const ContentCarousel = ({ title, items }: ContentCarouselProps) => {
                   hoveredItem === item.id ? "opacity-100" : "opacity-0"
                 }`}
                 style={{
-                  boxShadow: `inset 0 0 60px hsl(var(${item.accentColor}) / 0.2), 0 0 40px -10px hsl(var(${item.accentColor}) / 0.3)`,
+                  boxShadow: `inset 0 0 80px hsl(var(${item.accentColor}) / 0.25)`,
                 }}
               />
               
@@ -94,24 +109,25 @@ const ContentCarousel = ({ title, items }: ContentCarouselProps) => {
                   hoveredItem === item.id ? "opacity-100" : "opacity-0"
                 }`}
               >
-                <div className="w-14 h-14 rounded-full bg-foreground/90 backdrop-blur-sm flex items-center justify-center transform transition-transform duration-300 hover:scale-110">
+                <div className="w-14 h-14 rounded-full bg-foreground/95 backdrop-blur-sm flex items-center justify-center transform transition-transform duration-300 hover:scale-110 shadow-xl">
                   <Play className="w-6 h-6 text-background ml-1" fill="currentColor" />
                 </div>
               </div>
               
               {/* Content info */}
               <div className="absolute bottom-0 left-0 right-0 p-4">
-                <h4 className="text-sm font-medium text-foreground truncate">{item.title}</h4>
-                <p className="text-xs text-muted-foreground truncate mt-0.5">{item.subtitle}</p>
+                <h4 className="text-sm font-medium text-foreground truncate text-shadow-sm">{item.title}</h4>
+                <p className="text-xs text-foreground/70 truncate mt-0.5">{item.subtitle}</p>
                 
-                {/* Progress bar */}
+                {/* Progress bar - enhanced */}
                 {item.progress !== undefined && (
-                  <div className="mt-2 h-0.5 bg-muted rounded-full overflow-hidden">
+                  <div className="mt-3 h-1 bg-foreground/20 rounded-full overflow-hidden">
                     <div
                       className="h-full rounded-full transition-all duration-300"
                       style={{
                         width: `${item.progress}%`,
                         backgroundColor: `hsl(var(${item.accentColor}))`,
+                        boxShadow: `0 0 8px hsl(var(${item.accentColor}) / 0.5)`,
                       }}
                     />
                   </div>
