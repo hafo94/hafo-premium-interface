@@ -1,9 +1,16 @@
 import { useState, useEffect } from "react";
-import { Film, Tv, Gamepad2, Monitor, Music, Youtube, ChevronDown, Wifi, Settings, LucideIcon } from "lucide-react";
+import { Film, Tv, Gamepad2, Monitor, Music, Youtube, ChevronDown, Wifi, Settings, LogOut, Users, LucideIcon } from "lucide-react";
 import AnimatedBackground from "./AnimatedBackground";
 import ContentCarousel from "./ContentCarousel";
 import FeaturedHero from "./FeaturedHero";
 import AppTile from "./AppTile";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Profile {
   id: string;
@@ -212,23 +219,41 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
             </div>
           </div>
 
-          {/* Profile Button with Avatar */}
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:ring-2 hover:ring-foreground/10"
-          >
-            {/* Avatar Circle */}
-            <div 
-              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white/90 shadow-lg"
-              style={{ backgroundColor: profile.avatar }}
-            >
-              {profile.name.charAt(0).toUpperCase()}
-            </div>
-            <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal">
-              {profile.name}
-            </span>
-            <ChevronDown className="w-4 h-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" strokeWidth={1.5} />
-          </button>
+          {/* Profile Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                className="flex items-center gap-3 px-4 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:ring-2 hover:ring-foreground/10 focus:outline-none"
+              >
+                {/* Avatar Circle */}
+                <div 
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white/90 shadow-lg"
+                  style={{ backgroundColor: profile.avatar }}
+                >
+                  {profile.name.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal">
+                  {profile.name}
+                </span>
+                <ChevronDown className="w-4 h-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" strokeWidth={1.5} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 bg-card/95 backdrop-blur-xl border-border/50">
+              <DropdownMenuItem className="cursor-pointer gap-2">
+                <Settings className="w-4 h-4" strokeWidth={1.5} />
+                <span>Settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer gap-2">
+                <Users className="w-4 h-4" strokeWidth={1.5} />
+                <span>Switch Profile</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-2 text-destructive focus:text-destructive">
+                <LogOut className="w-4 h-4" strokeWidth={1.5} />
+                <span>Logout</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
