@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Film, Tv, Gamepad2, Monitor, Music, Youtube, LogOut, LucideIcon } from "lucide-react";
+import { Film, Tv, Gamepad2, Monitor, Music, Youtube, ChevronDown, LucideIcon } from "lucide-react";
 import AnimatedBackground from "./AnimatedBackground";
 import ContentCarousel from "./ContentCarousel";
 import FeaturedHero from "./FeaturedHero";
@@ -184,30 +184,47 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
       
       {/* Header */}
       <header className="relative flex items-center justify-between px-8 md:px-16 py-6 animate-fade-in-scale z-10">
-        <div className="flex items-center gap-8">
-          <h1 className="text-2xl font-light tracking-[0.3em] text-gradient animate-breathe">hafo</h1>
+        {/* Logo - Left Side */}
+        <div className="flex items-center">
+          <h1 className="text-2xl font-light tracking-[0.35em] text-gradient animate-breathe text-shadow-lg">
+            hafo
+          </h1>
         </div>
         
-        {/* Time Display */}
-        <div className="absolute left-1/2 -translate-x-1/2 text-center">
-          <div className="text-4xl md:text-6xl font-light tracking-wider text-foreground tabular-nums text-shadow-lg">
-            {formatTime(currentTime)}
+        {/* Right Side - Time/Date + Profile */}
+        <div className="flex items-center gap-6">
+          {/* Discrete Time/Date Display */}
+          <div className="text-right hidden sm:block">
+            <div className="text-lg font-normal tracking-wide text-foreground/70 tabular-nums">
+              {formatTime(currentTime)}
+            </div>
+            <div className="text-xs font-normal text-foreground/40 tracking-wider">
+              {formatDate(currentTime)}
+            </div>
           </div>
-          <div className="text-sm font-normal text-muted-foreground tracking-wide mt-1">
-            {formatDate(currentTime)}
-          </div>
-        </div>
 
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 px-5 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:scale-105"
-        >
-          <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal">
-            {profile.name}
-          </span>
-          <LogOut className="w-4 h-4 text-foreground/60 group-hover:text-foreground transition-colors" strokeWidth={1.5} />
-        </button>
+          {/* Profile Button with Avatar */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 px-4 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:ring-2 hover:ring-foreground/10"
+          >
+            {/* Avatar Circle */}
+            <div 
+              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white/90 shadow-lg"
+              style={{ backgroundColor: profile.avatar }}
+            >
+              {profile.name.charAt(0).toUpperCase()}
+            </div>
+            <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal">
+              {profile.name}
+            </span>
+            <ChevronDown className="w-4 h-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" strokeWidth={1.5} />
+          </button>
+        </div>
       </header>
+
+      {/* Header Separator */}
+      <div className="header-separator mx-8 md:mx-16" />
 
       {/* Main Content */}
       <main className="relative flex-1 flex flex-col px-8 md:px-16 pb-8 z-10 overflow-hidden">
