@@ -1,5 +1,8 @@
 import { useState, useEffect } from "react";
 import { Film, Tv, Gamepad2, Monitor, Music, Youtube, ChevronDown, Wifi, Settings, LogOut, Users, LucideIcon } from "lucide-react";
+import breakingBadHeader from "@/assets/breaking_bad_header.png";
+import eldenRingHeader from "@/assets/elden_ring_header.png";
+import chillVibesHeader from "@/assets/chill_vibes_header.png";
 import AnimatedBackground from "./AnimatedBackground";
 import ContentCarousel from "./ContentCarousel";
 import FeaturedHero from "./FeaturedHero";
@@ -102,7 +105,7 @@ const featuredContent: FeaturedContent[] = [
     subtitle: "Breaking Bad",
     gradient: "from-nipflix/40 via-nipflix/15 to-transparent",
     accentColor: "text-nipflix",
-    image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&h=600&fit=crop",
+    image: breakingBadHeader,
   },
   {
     type: "game",
@@ -110,7 +113,7 @@ const featuredContent: FeaturedContent[] = [
     subtitle: "Elden Ring",
     gradient: "from-steam/40 via-steam/15 to-transparent",
     accentColor: "text-steam",
-    image: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=1200&h=600&fit=crop",
+    image: eldenRingHeader,
   },
   {
     type: "music",
@@ -118,7 +121,7 @@ const featuredContent: FeaturedContent[] = [
     subtitle: "Chill Vibes",
     gradient: "from-spotify/40 via-spotify/15 to-transparent",
     accentColor: "text-spotify",
-    image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200&h=600&fit=crop",
+    image: chillVibesHeader,
   },
 ];
 
