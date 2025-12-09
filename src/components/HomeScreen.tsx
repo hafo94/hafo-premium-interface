@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Film, Tv, Gamepad2, Monitor, Music, Youtube, ChevronDown, LucideIcon } from "lucide-react";
+import { Film, Tv, Gamepad2, Monitor, Music, Youtube, ChevronDown, Wifi, Settings, LucideIcon } from "lucide-react";
 import AnimatedBackground from "./AnimatedBackground";
 import ContentCarousel from "./ContentCarousel";
 import FeaturedHero from "./FeaturedHero";
@@ -191,8 +191,17 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
           </h1>
         </div>
         
-        {/* Right Side - Time/Date + Profile */}
-        <div className="flex items-center gap-6">
+        {/* Right Side - Status + Time/Date + Profile */}
+        <div className="flex items-center gap-5">
+          {/* Status Indicators */}
+          <div className="flex items-center gap-3 text-foreground/40">
+            <Wifi className="w-4 h-4" strokeWidth={1.5} />
+            <Settings className="w-4 h-4 hover:text-foreground/60 cursor-pointer transition-colors" strokeWidth={1.5} />
+          </div>
+
+          {/* Subtle Divider */}
+          <div className="h-5 w-px bg-border/30 hidden sm:block" />
+
           {/* Discrete Time/Date Display */}
           <div className="text-right hidden sm:block">
             <div className="text-lg font-normal tracking-wide text-foreground/70 tabular-nums">
