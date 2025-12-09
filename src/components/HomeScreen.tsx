@@ -1,5 +1,9 @@
 import { useState, useEffect } from "react";
-import { Film, Tv, Gamepad2, Monitor, Music, Youtube, LogOut, Play, Clock, LucideIcon } from "lucide-react";
+import { Film, Tv, Gamepad2, Monitor, Music, Youtube, LogOut, LucideIcon } from "lucide-react";
+import AnimatedBackground from "./AnimatedBackground";
+import ContentCarousel from "./ContentCarousel";
+import FeaturedHero from "./FeaturedHero";
+import AppTile from "./AppTile";
 
 interface Profile {
   id: string;
@@ -12,13 +16,14 @@ interface HomeScreenProps {
   onLogout: () => void;
 }
 
-interface AppTile {
+interface AppTileData {
   id: string;
   name: string;
   icon: LucideIcon;
   color: string;
   glowClass: string;
   bgGradient: string;
+  badge?: string;
 }
 
 interface FeaturedContent {
@@ -27,9 +32,10 @@ interface FeaturedContent {
   subtitle: string;
   gradient: string;
   accentColor: string;
+  image: string;
 }
 
-const apps: AppTile[] = [
+const apps: AppTileData[] = [
   {
     id: "nipflix",
     name: "Nipflix",
@@ -37,6 +43,7 @@ const apps: AppTile[] = [
     color: "text-nipflix",
     glowClass: "glow-nipflix",
     bgGradient: "from-nipflix/20 to-nipflix/5",
+    badge: "New",
   },
   {
     id: "youtube",
@@ -84,24 +91,42 @@ const featuredContent: FeaturedContent[] = [
   {
     type: "series",
     title: "Continue Watching",
-    subtitle: "Breaking Bad • S5 E14",
+    subtitle: "Breaking Bad",
     gradient: "from-nipflix/30 via-nipflix/10 to-transparent",
     accentColor: "text-nipflix",
+    image: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=1200&h=600&fit=crop",
   },
   {
     type: "game",
     title: "Last Played",
-    subtitle: "Elden Ring • 47h played",
+    subtitle: "Elden Ring",
     gradient: "from-steam/30 via-steam/10 to-transparent",
     accentColor: "text-steam",
+    image: "https://images.unsplash.com/photo-1538481199705-c710c4e965fc?w=1200&h=600&fit=crop",
   },
   {
     type: "music",
-    title: "Recently Played",
-    subtitle: "Chill Vibes Playlist",
+    title: "Now Playing",
+    subtitle: "Chill Vibes",
     gradient: "from-spotify/30 via-spotify/10 to-transparent",
     accentColor: "text-spotify",
+    image: "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=1200&h=600&fit=crop",
   },
+];
+
+const continueWatchingItems = [
+  { id: "1", title: "Breaking Bad", subtitle: "S5 E14", image: "https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?w=400&h=600&fit=crop", progress: 65, accentColor: "--nipflix" },
+  { id: "2", title: "The Office", subtitle: "S3 E12", image: "https://images.unsplash.com/photo-1522869635100-9f4c5e86aa37?w=400&h=600&fit=crop", progress: 30, accentColor: "--nipflix" },
+  { id: "3", title: "Stranger Things", subtitle: "S4 E7", image: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=600&fit=crop", progress: 80, accentColor: "--nipflix" },
+  { id: "4", title: "Dark", subtitle: "S2 E5", image: "https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400&h=600&fit=crop", progress: 45, accentColor: "--nipflix" },
+  { id: "5", title: "Better Call Saul", subtitle: "S6 E3", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&h=600&fit=crop", progress: 15, accentColor: "--nipflix" },
+];
+
+const recentGamesItems = [
+  { id: "1", title: "Elden Ring", subtitle: "47h played", image: "https://images.unsplash.com/photo-1552820728-8b83bb6b2b0b?w=400&h=600&fit=crop", accentColor: "--steam" },
+  { id: "2", title: "Cyberpunk 2077", subtitle: "23h played", image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&h=600&fit=crop", accentColor: "--steam" },
+  { id: "3", title: "Hades", subtitle: "89h played", image: "https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400&h=600&fit=crop", accentColor: "--retro" },
+  { id: "4", title: "Hollow Knight", subtitle: "34h played", image: "https://images.unsplash.com/photo-1511512578047-dfb367046420?w=400&h=600&fit=crop", accentColor: "--retro" },
 ];
 
 const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
@@ -144,6 +169,9 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
   };
 
   const featured = featuredContent[featuredIndex];
+  const activeAccentColor = hoveredApp 
+    ? `--${hoveredApp}` 
+    : featured.accentColor.replace("text-", "--");
 
   return (
     <div
@@ -151,18 +179,18 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
         isVisible ? "opacity-100" : "opacity-0"
       }`}
     >
-      {/* Background ambient glow */}
-      <div className={`fixed inset-0 bg-gradient-to-br ${featured.gradient} opacity-40 transition-all duration-1000 pointer-events-none`} />
+      {/* Animated Background */}
+      <AnimatedBackground accentColor={activeAccentColor} />
       
       {/* Header */}
-      <header className="relative flex items-center justify-between px-8 md:px-16 py-6 animate-fade-in-scale">
+      <header className="relative flex items-center justify-between px-8 md:px-16 py-6 animate-fade-in-scale z-10">
         <div className="flex items-center gap-8">
-          <h1 className="text-2xl font-extralight tracking-[0.2em] text-gradient">hafo</h1>
+          <h1 className="text-2xl font-extralight tracking-[0.2em] text-gradient animate-breathe">hafo</h1>
         </div>
         
         {/* Time Display */}
         <div className="absolute left-1/2 -translate-x-1/2 text-center">
-          <div className="text-4xl md:text-5xl font-extralight tracking-wider text-foreground">
+          <div className="text-4xl md:text-6xl font-extralight tracking-wider text-foreground tabular-nums">
             {formatTime(currentTime)}
           </div>
           <div className="text-sm font-light text-muted-foreground tracking-wide mt-1">
@@ -172,7 +200,7 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
 
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-4 py-2 rounded-full glass hover:bg-secondary/80 transition-all duration-200 group"
+          className="flex items-center gap-3 px-4 py-2 rounded-full glass hover:bg-secondary/60 transition-all duration-300 group hover:scale-105"
         >
           <span className="text-muted-foreground group-hover:text-foreground transition-colors font-light">
             {profile.name}
@@ -182,108 +210,50 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
       </header>
 
       {/* Main Content */}
-      <main className="relative flex-1 flex flex-col px-8 md:px-16 pb-8">
+      <main className="relative flex-1 flex flex-col px-8 md:px-16 pb-8 z-10 overflow-hidden">
         {/* Featured Content Hero */}
-        <div className="mb-8 md:mb-12 animate-fade-in-scale" style={{ animationDelay: "0.1s" }}>
-          <div 
-            className={`relative overflow-hidden rounded-3xl bg-gradient-to-r ${featured.gradient} border border-border/30 p-8 md:p-12 transition-all duration-700`}
-          >
-            {/* Decorative elements */}
-            <div className="absolute top-0 right-0 w-1/2 h-full opacity-20">
-              <div className={`absolute inset-0 bg-gradient-to-l ${featured.gradient}`} />
-            </div>
-            
-            <div className="relative z-10 flex items-center justify-between">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="w-4 h-4" strokeWidth={1.5} />
-                  <span className={`text-sm font-medium uppercase tracking-wider ${featured.accentColor}`}>
-                    {featured.title}
-                  </span>
-                </div>
-                <h2 className="text-2xl md:text-4xl font-light text-foreground tracking-wide">
-                  {featured.subtitle}
-                </h2>
-                <div className="flex gap-3 pt-4">
-                  <button className="flex items-center gap-2 px-6 py-3 rounded-full bg-foreground text-background font-medium hover:bg-foreground/90 transition-all duration-200">
-                    <Play className="w-4 h-4" fill="currentColor" />
-                    Resume
-                  </button>
-                  <button className="px-6 py-3 rounded-full glass hover:bg-secondary transition-all duration-200 font-light">
-                    Details
-                  </button>
-                </div>
-              </div>
-              
-              {/* Progress indicators */}
-              <div className="hidden md:flex items-center gap-2">
-                {featuredContent.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setFeaturedIndex(idx)}
-                    className={`h-1 rounded-full transition-all duration-300 ${
-                      idx === featuredIndex ? "w-8 bg-foreground" : "w-2 bg-muted-foreground/40 hover:bg-muted-foreground/60"
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
+        <div className="mb-6 md:mb-8 animate-fade-in-scale" style={{ animationDelay: "0.1s" }}>
+          <FeaturedHero 
+            content={featured}
+            allContent={featuredContent}
+            currentIndex={featuredIndex}
+            onIndexChange={setFeaturedIndex}
+          />
+        </div>
+
+        {/* Content Carousels */}
+        <div className="space-y-6 mb-8 animate-fade-in-scale" style={{ animationDelay: "0.2s" }}>
+          <ContentCarousel title="Continue Watching" items={continueWatchingItems} />
+          <ContentCarousel title="Recent Games" items={recentGamesItems} />
         </div>
 
         {/* Apps Section */}
-        <div className="flex-1 flex flex-col justify-center">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-6 animate-fade-in-scale" style={{ animationDelay: "0.2s" }}>
+        <div className="mt-auto">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-widest mb-4 animate-fade-in-scale" style={{ animationDelay: "0.3s" }}>
             Your Apps
           </h3>
           
           {/* Apps Grid */}
-          <div className="grid grid-cols-3 md:grid-cols-6 gap-4 md:gap-6">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3 md:gap-5">
             {apps.map((app, index) => (
-              <button
+              <AppTile
                 key={app.id}
-                onMouseEnter={() => setHoveredApp(app.id)}
-                onMouseLeave={() => setHoveredApp(null)}
-                className="group animate-slide-up"
-                style={{ animationDelay: `${0.3 + index * 0.05}s` }}
-              >
-                <div
-                  className={`relative aspect-square rounded-2xl md:rounded-3xl bg-gradient-to-br ${app.bgGradient} 
-                    border border-border/40 flex flex-col items-center justify-center gap-2 md:gap-4
-                    transition-all duration-500 ease-out
-                    ${hoveredApp === app.id ? `scale-110 ${app.glowClass} border-border` : ""}
-                    ${hoveredApp && hoveredApp !== app.id ? "opacity-40 scale-95" : ""}
-                  `}
-                >
-                  {/* Background glow effect */}
-                  <div
-                    className={`absolute inset-0 rounded-2xl md:rounded-3xl bg-gradient-to-br ${app.bgGradient} blur-2xl 
-                      transition-opacity duration-500 ${hoveredApp === app.id ? "opacity-60" : "opacity-0"}`}
-                  />
-                  
-                  <app.icon
-                    className={`relative w-8 h-8 md:w-12 md:h-12 ${app.color} transition-all duration-300
-                      ${hoveredApp === app.id ? "scale-110" : ""}`}
-                    strokeWidth={1.2}
-                  />
-                  <span
-                    className={`relative text-xs md:text-sm font-light tracking-wide transition-colors duration-300
-                      ${hoveredApp === app.id ? "text-foreground" : "text-muted-foreground"}`}
-                  >
-                    {app.name}
-                  </span>
-                </div>
-              </button>
+                {...app}
+                index={index}
+                isHovered={hoveredApp === app.id}
+                isOtherHovered={hoveredApp !== null && hoveredApp !== app.id}
+                onHover={setHoveredApp}
+              />
             ))}
           </div>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="relative px-8 md:px-16 py-4">
-        <div className="flex items-center justify-between text-xs text-muted-foreground/50">
+      <footer className="relative z-10 px-8 md:px-16 py-4">
+        <div className="flex items-center justify-between text-xs text-muted-foreground/40">
           <span className="font-light tracking-wider">hafo media hub</span>
-          <div className="h-px w-24 bg-gradient-to-r from-transparent via-border to-transparent" />
+          <div className="h-px w-24 bg-gradient-to-r from-transparent via-border/50 to-transparent" />
           <span className="font-light">v1.0</span>
         </div>
       </footer>
