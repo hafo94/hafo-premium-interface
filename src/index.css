@@ -34,7 +34,15 @@
 
     --radius: 1rem;
 
-    /* App accent colors */
+    /* Sidebar */
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 0 0% 6%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 20%;
+    --sidebar-ring: 0 0% 50%;
     --nipflix: 0 72% 51%;
     --youtube: 0 100% 50%;
     --tv: 217 91% 60%;
