@@ -44,6 +44,7 @@
     --sidebar-border: 0 0% 20%;
     --sidebar-ring: 0 0% 50%;
     --nipflix: 0 72% 51%;
+    --movies: 32 95% 55%;
     --youtube: 0 100% 50%;
     --tv: 217 91% 60%;
     --retro: 271 81% 56%;
@@ -145,6 +146,10 @@
 
   .glow-youtube {
     box-shadow: var(--shadow-glow) hsl(var(--youtube) / 0.6), var(--shadow-elevated), var(--shadow-ambient) hsl(var(--youtube) / 0.2);
+  }
+
+  .glow-movies {
+    box-shadow: var(--shadow-glow) hsl(var(--movies) / 0.6), var(--shadow-elevated), var(--shadow-ambient) hsl(var(--movies) / 0.2);
   }
 
   .bg-noise {

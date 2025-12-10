@@ -21,9 +21,10 @@ interface AppItem {
 }
 
 const apps: AppItem[] = [
-  { id: "nipflix", name: "Nipflix", icon: Film, color: "text-nipflix", glowClass: "glow-nipflix", badge: "New" },
+  { id: "series", name: "Series", icon: Tv, color: "text-nipflix", glowClass: "glow-nipflix", badge: "New" },
+  { id: "movies", name: "Movies", icon: Film, color: "text-movies", glowClass: "glow-movies" },
   { id: "youtube", name: "YouTube", icon: Youtube, color: "text-youtube", glowClass: "glow-youtube" },
-  { id: "tv", name: "TV", icon: Tv, color: "text-tv", glowClass: "glow-tv" },
+  { id: "tv", name: "TV", icon: Monitor, color: "text-tv", glowClass: "glow-tv" },
   { id: "retro", name: "Retro Gaming", icon: Gamepad2, color: "text-retro", glowClass: "glow-retro" },
   { id: "steam", name: "Steam Link", icon: Monitor, color: "text-steam", glowClass: "glow-steam" },
   { id: "spotify", name: "Spotify", icon: Music, color: "text-spotify", glowClass: "glow-spotify" },
