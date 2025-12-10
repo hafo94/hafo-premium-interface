@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, Wifi, Settings, LogOut, Users, Menu } from "lucide-react";
+import { ChevronDown, Wifi, Settings, LogOut, Users } from "lucide-react";
 import breakingBadHeader from "@/assets/breaking_bad_header.png";
 import eldenRingHeader from "@/assets/elden_ring_header.png";
 import chillVibesHeader from "@/assets/chill_vibes_header.png";
@@ -18,7 +18,6 @@ import ContentCarousel from "./ContentCarousel";
 import FeaturedHero from "./FeaturedHero";
 import AppSidebar from "./AppSidebar";
 import SettingsModal from "./SettingsModal";
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -134,125 +133,120 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
     : featured.accentColor.replace("text-", "--");
 
   return (
-    <SidebarProvider defaultOpen={true}>
-      <div
-        className={`min-h-screen flex w-full transition-opacity duration-500 ${
-          isVisible ? "opacity-100" : "opacity-0"
-        }`}
-      >
-        {/* Animated Background */}
-        <AnimatedBackground accentColor={activeAccentColor} />
-        
-        {/* App Sidebar */}
-        <AppSidebar onAppHover={setHoveredApp} hoveredApp={hoveredApp} />
+    <div
+      className={`min-h-screen w-full transition-opacity duration-500 ${
+        isVisible ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      {/* Animated Background */}
+      <AnimatedBackground accentColor={activeAccentColor} />
+      
+      {/* App Sidebar - Fixed position, transparent */}
+      <AppSidebar onAppHover={setHoveredApp} hoveredApp={hoveredApp} />
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-h-screen relative z-10">
-          {/* Header */}
-          <header className="relative flex items-center justify-between px-6 md:px-12 py-6 animate-fade-in-scale">
-            {/* Mobile Sidebar Trigger */}
-            <div className="md:hidden">
-              <SidebarTrigger className="text-foreground/60 hover:text-foreground" />
+      {/* Main Content Area - offset for sidebar */}
+      <div className="min-h-screen flex flex-col relative z-10 pl-20">
+        {/* Header */}
+        <header className="relative flex items-center justify-between px-6 md:px-12 py-6 animate-fade-in-scale">
+          {/* Logo on left */}
+          <h1 className="text-xl font-light tracking-[0.35em] text-gradient animate-breathe">
+            hafo
+          </h1>
+          
+          {/* Right Side - Status + Time/Date + Profile */}
+          <div className="flex items-center gap-5">
+            {/* Status Indicators */}
+            <div className="flex items-center gap-3 text-foreground/40">
+              <Wifi className="w-4 h-4" strokeWidth={1.5} />
+              <Settings className="w-4 h-4 hover:text-foreground/60 cursor-pointer transition-colors" strokeWidth={1.5} onClick={() => setSettingsOpen(true)} />
             </div>
-            
-            {/* Spacer for desktop */}
-            <div className="hidden md:block" />
-            
-            {/* Right Side - Status + Time/Date + Profile */}
-            <div className="flex items-center gap-5">
-              {/* Status Indicators */}
-              <div className="flex items-center gap-3 text-foreground/40">
-                <Wifi className="w-4 h-4" strokeWidth={1.5} />
-                <Settings className="w-4 h-4 hover:text-foreground/60 cursor-pointer transition-colors" strokeWidth={1.5} onClick={() => setSettingsOpen(true)} />
+
+            {/* Subtle Divider */}
+            <div className="h-5 w-px bg-border/30 hidden sm:block" />
+
+            {/* Discrete Time/Date Display */}
+            <div className="text-right hidden sm:block">
+              <div className="text-lg font-normal tracking-wide text-foreground/70 tabular-nums">
+                {formatTime(currentTime)}
               </div>
-
-              {/* Subtle Divider */}
-              <div className="h-5 w-px bg-border/30 hidden sm:block" />
-
-              {/* Discrete Time/Date Display */}
-              <div className="text-right hidden sm:block">
-                <div className="text-lg font-normal tracking-wide text-foreground/70 tabular-nums">
-                  {formatTime(currentTime)}
-                </div>
-                <div className="text-xs font-normal text-foreground/40 tracking-wider">
-                  {formatDate(currentTime)}
-                </div>
+              <div className="text-xs font-normal text-foreground/40 tracking-wider">
+                {formatDate(currentTime)}
               </div>
+            </div>
 
-              {/* Profile Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="flex items-center gap-3 px-4 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:ring-2 hover:ring-foreground/10 focus:outline-none"
+            {/* Profile Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:ring-2 hover:ring-foreground/10 focus:outline-none"
+                >
+                  {/* Avatar Circle */}
+                  <div 
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white/90 shadow-lg"
+                    style={{ backgroundColor: profile.avatar }}
                   >
-                    {/* Avatar Circle */}
-                    <div 
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white/90 shadow-lg"
-                      style={{ backgroundColor: profile.avatar }}
-                    >
-                      {profile.name.charAt(0).toUpperCase()}
-                    </div>
-                    <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal hidden sm:inline">
-                      {profile.name}
-                    </span>
-                    <ChevronDown className="w-4 h-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" strokeWidth={1.5} />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-card/95 backdrop-blur-xl border-border/50">
-                  <DropdownMenuItem onClick={() => setSettingsOpen(true)} className="cursor-pointer gap-2">
-                    <Settings className="w-4 h-4" strokeWidth={1.5} />
-                    <span>Settings</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="cursor-pointer gap-2">
-                    <Users className="w-4 h-4" strokeWidth={1.5} />
-                    <span>Switch Profile</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-2 text-destructive focus:text-destructive">
-                    <LogOut className="w-4 h-4" strokeWidth={1.5} />
-                    <span>Logout</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </header>
+                    {profile.name.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal hidden sm:inline">
+                    {profile.name}
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" strokeWidth={1.5} />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-card/95 backdrop-blur-xl border-border/50">
+                <DropdownMenuItem onClick={() => setSettingsOpen(true)} className="cursor-pointer gap-2">
+                  <Settings className="w-4 h-4" strokeWidth={1.5} />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem className="cursor-pointer gap-2">
+                  <Users className="w-4 h-4" strokeWidth={1.5} />
+                  <span>Switch Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer gap-2 text-destructive focus:text-destructive">
+                  <LogOut className="w-4 h-4" strokeWidth={1.5} />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </header>
 
-          {/* Header Separator */}
-          <div className="header-separator mx-6 md:mx-12" />
+        {/* Header Separator */}
+        <div className="header-separator mx-6 md:mx-12" />
 
-          {/* Main Content */}
-          <main className="relative flex-1 flex flex-col px-6 md:px-12 pb-8 overflow-hidden">
-            {/* Featured Content Hero */}
-            <div className="mb-6 md:mb-8 animate-fade-in-scale" style={{ animationDelay: "0.1s" }}>
-              <FeaturedHero 
-                content={featured}
-                allContent={featuredContent}
-                currentIndex={featuredIndex}
-                onIndexChange={setFeaturedIndex}
-              />
-            </div>
+        {/* Main Content */}
+        <main className="relative flex-1 flex flex-col px-6 md:px-12 pb-8 overflow-hidden">
+          {/* Featured Content Hero */}
+          <div className="mb-6 md:mb-8 animate-fade-in-scale" style={{ animationDelay: "0.1s" }}>
+            <FeaturedHero 
+              content={featured}
+              allContent={featuredContent}
+              currentIndex={featuredIndex}
+              onIndexChange={setFeaturedIndex}
+            />
+          </div>
 
-            {/* Content Carousels */}
-            <div className="space-y-6 flex-1 animate-fade-in-scale" style={{ animationDelay: "0.2s" }}>
-              <ContentCarousel title="Continue Watching" items={continueWatchingItems} />
-              <ContentCarousel title="Recent Games" items={recentGamesItems} />
-            </div>
-          </main>
+          {/* Content Carousels */}
+          <div className="space-y-6 flex-1 animate-fade-in-scale" style={{ animationDelay: "0.2s" }}>
+            <ContentCarousel title="Continue Watching" items={continueWatchingItems} />
+            <ContentCarousel title="Recent Games" items={recentGamesItems} />
+          </div>
+        </main>
 
-          {/* Footer */}
-          <footer className="relative px-6 md:px-12 py-4">
-            <div className="flex items-center justify-between text-xs text-foreground/30">
-              <span className="font-normal tracking-wider">hafo media hub</span>
-              <div className="h-px w-24 bg-gradient-to-r from-transparent via-border to-transparent" />
-              <span className="font-normal">v1.0</span>
-            </div>
-          </footer>
-        </div>
-
-        {/* Settings Modal */}
-        <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+        {/* Footer */}
+        <footer className="relative px-6 md:px-12 py-4">
+          <div className="flex items-center justify-between text-xs text-foreground/30">
+            <span className="font-normal tracking-wider">hafo media hub</span>
+            <div className="h-px w-24 bg-gradient-to-r from-transparent via-border to-transparent" />
+            <span className="font-normal">v1.0</span>
+          </div>
+        </footer>
       </div>
-    </SidebarProvider>
+
+      {/* Settings Modal */}
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
+    </div>
   );
 };
 
