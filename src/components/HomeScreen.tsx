@@ -178,19 +178,16 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="flex items-center gap-3 px-4 py-2.5 rounded-full glass-premium hover:bg-secondary/60 transition-all duration-300 group hover:ring-2 hover:ring-foreground/10 focus:outline-none"
+                  className="flex items-center gap-2 px-2 py-1.5 rounded-full hover:bg-foreground/5 transition-all duration-300 group focus:outline-none"
                 >
                   {/* Avatar Circle */}
                   <div 
-                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-medium text-white/90 shadow-lg"
+                    className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-medium text-white/90"
                     style={{ backgroundColor: profile.avatar }}
                   >
                     {profile.name.charAt(0).toUpperCase()}
                   </div>
-                  <span className="text-foreground/80 group-hover:text-foreground transition-colors font-normal hidden sm:inline">
-                    {profile.name}
-                  </span>
-                  <ChevronDown className="w-4 h-4 text-foreground/40 group-hover:text-foreground/60 transition-colors" strokeWidth={1.5} />
+                  <ChevronDown className="w-3 h-3 text-foreground/30 group-hover:text-foreground/50 transition-colors" strokeWidth={1.5} />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-card/95 backdrop-blur-xl border-border/50">
