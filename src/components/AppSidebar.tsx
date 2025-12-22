@@ -1,4 +1,4 @@
-import { Film, Tv, Gamepad2, Monitor, Music, Youtube, LucideIcon } from "lucide-react";
+import { Film, Gamepad2, Monitor, Youtube, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -16,13 +16,11 @@ interface AppItem {
 }
 
 const apps: AppItem[] = [
-  { id: "series", name: "Series", icon: Tv, color: "text-nipflix", hoverBg: "hover:bg-nipflix/10" },
-  { id: "movies", name: "Movies", icon: Film, color: "text-movies", hoverBg: "hover:bg-movies/10" },
+  { id: "watch", name: "Watch", icon: Film, color: "text-nipflix", hoverBg: "hover:bg-nipflix/10" },
   { id: "youtube", name: "YouTube", icon: Youtube, color: "text-youtube", hoverBg: "hover:bg-youtube/10" },
   { id: "tv", name: "TV", icon: Monitor, color: "text-tv", hoverBg: "hover:bg-tv/10" },
   { id: "retro", name: "Retro Gaming", icon: Gamepad2, color: "text-retro", hoverBg: "hover:bg-retro/10" },
   { id: "steam", name: "Steam Link", icon: Monitor, color: "text-steam", hoverBg: "hover:bg-steam/10" },
-  { id: "spotify", name: "Spotify", icon: Music, color: "text-spotify", hoverBg: "hover:bg-spotify/10" },
 ];
 
 interface AppSidebarProps {
