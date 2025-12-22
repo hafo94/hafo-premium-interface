@@ -1,4 +1,4 @@
-import { Play, Plus, Info, Star } from 'lucide-react';
+import { Play, Plus, Check, Info, Star } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { WatchContent } from '@/data/watchContent';
 import { cn } from '@/lib/utils';
@@ -6,13 +6,15 @@ import { cn } from '@/lib/utils';
 interface FeaturedHeroProps {
   content: WatchContent;
   isActive: boolean;
+  isInList: boolean;
   onSelect: (content: WatchContent) => void;
   onInfo: (content: WatchContent) => void;
+  onToggleList: (id: string) => void;
 }
 
-const FeaturedHero = ({ content, isActive, onSelect, onInfo }: FeaturedHeroProps) => {
+const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleList }: FeaturedHeroProps) => {
   const [focusedButton, setFocusedButton] = useState(0);
-  const buttons = ['play', 'info'];
+  const buttons = ['play', 'info', 'list'];
 
   // Handle keyboard navigation when hero is active
   useEffect(() => {
@@ -29,15 +31,17 @@ const FeaturedHero = ({ content, isActive, onSelect, onInfo }: FeaturedHeroProps
         e.preventDefault();
         if (focusedButton === 0) {
           onSelect(content);
-        } else {
+        } else if (focusedButton === 1) {
           onInfo(content);
+        } else {
+          onToggleList(content.id);
         }
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isActive, focusedButton, content, onSelect, onInfo]);
+  }, [isActive, focusedButton, content, onSelect, onInfo, onToggleList]);
 
   return (
     <div className="relative w-full h-[70vh] min-h-[500px] max-h-[700px]">
@@ -123,8 +127,17 @@ const FeaturedHero = ({ content, isActive, onSelect, onInfo }: FeaturedHeroProps
               More Info
             </button>
 
-            <button className="p-3 rounded-full border-2 border-muted-foreground/40 text-foreground hover:border-foreground transition-colors">
-              <Plus className="w-5 h-5" />
+            <button 
+              onClick={() => onToggleList(content.id)}
+              className={cn(
+                'p-3 rounded-full border-2 transition-all duration-200',
+                isInList 
+                  ? 'border-nipflix bg-nipflix/20 text-nipflix' 
+                  : 'border-muted-foreground/40 text-foreground hover:border-foreground',
+                isActive && focusedButton === 2 && 'ring-4 ring-nipflix scale-110'
+              )}
+            >
+              {isInList ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
             </button>
           </div>
 
