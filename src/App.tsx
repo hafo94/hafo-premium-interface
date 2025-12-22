@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import Watch from "./pages/Watch";
 import YouTubePage from "./pages/YouTube";
 import TV from "./pages/TV";
+import Gaming from "./pages/Gaming";
 import RetroGaming from "./pages/RetroGaming";
 import SteamLink from "./pages/SteamLink";
 
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/watch" element={<Watch />} />
           <Route path="/youtube" element={<YouTubePage />} />
           <Route path="/tv" element={<TV />} />
+          <Route path="/gaming" element={<Gaming />} />
           <Route path="/retro" element={<RetroGaming />} />
           <Route path="/steam" element={<SteamLink />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
