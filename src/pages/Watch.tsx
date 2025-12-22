@@ -4,11 +4,17 @@ import { Link } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
 import ContentRow from '@/components/watch/ContentRow';
 import ContentDetail from '@/components/watch/ContentDetail';
+import FeaturedHero from '@/components/watch/FeaturedHero';
 import { watchContent, contentCategories, WatchContent } from '@/data/watchContent';
 
 const Watch = () => {
-  // Navigation state
-  const [focusedRow, setFocusedRow] = useState(0);
+  // Featured content - rotate through hot/recommended items
+  const featuredItems = watchContent.filter(item => item.isHot || item.isRecommended);
+  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const featuredContent = featuredItems[featuredIndex] || featuredItems[0];
+
+  // Navigation state - -1 means hero is focused
+  const [focusedRow, setFocusedRow] = useState(-1);
   const [focusedItems, setFocusedItems] = useState<number[]>(
     contentCategories.map(() => 0)
   );
@@ -24,11 +30,24 @@ const Watch = () => {
     }))
     .filter((cat) => cat.items.length > 0);
 
+  // Auto-rotate featured content
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFeaturedIndex(prev => (prev + 1) % featuredItems.length);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [featuredItems.length]);
+
   // Handle keyboard navigation
   useEffect(() => {
     if (selectedContent) return; // Don't handle if detail view is open
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // If hero is active, let FeaturedHero handle left/right/enter
+      if (focusedRow === -1 && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Enter')) {
+        return;
+      }
+
       switch (e.key) {
         case 'ArrowDown':
           e.preventDefault();
@@ -36,7 +55,7 @@ const Watch = () => {
           break;
         case 'ArrowUp':
           e.preventDefault();
-          setFocusedRow((prev) => Math.max(prev - 1, 0));
+          setFocusedRow((prev) => prev - 1);
           break;
         case 'ArrowRight':
           e.preventDefault();
@@ -85,8 +104,8 @@ const Watch = () => {
 
       {/* Main content */}
       <div className="relative z-10">
-        {/* Header */}
-        <header className="flex items-center justify-between p-6 pb-4">
+        {/* Header - overlaid on hero */}
+        <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between p-6">
           <div className="flex items-center gap-8">
             <Link
               to="/"
@@ -113,13 +132,31 @@ const Watch = () => {
           </div>
         </header>
 
-        {/* Category hint */}
-        <div className="px-12 py-2 text-sm text-muted-foreground">
-          Use <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground">↑</kbd> <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground">↓</kbd> to navigate rows, <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground">←</kbd> <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground">→</kbd> for items, <kbd className="px-1.5 py-0.5 bg-muted rounded text-foreground">Enter</kbd> to select
+        {/* Featured Hero */}
+        <FeaturedHero
+          content={featuredContent}
+          isActive={focusedRow === -1}
+          onSelect={setSelectedContent}
+          onInfo={setSelectedContent}
+        />
+
+        {/* Featured indicators */}
+        <div className="relative z-10 flex items-center justify-center gap-2 -mt-20 mb-6">
+          {featuredItems.slice(0, 5).map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setFeaturedIndex(idx)}
+              className={`h-1 rounded-full transition-all duration-300 ${
+                idx === featuredIndex 
+                  ? 'w-8 bg-nipflix' 
+                  : 'w-2 bg-muted-foreground/40 hover:bg-muted-foreground/60'
+              }`}
+            />
+          ))}
         </div>
 
         {/* Content Rows */}
-        <div className="py-4">
+        <div className="py-4 relative z-10">
           {visibleCategories.map((category, rowIndex) => (
             <ContentRow
               key={category.id}
