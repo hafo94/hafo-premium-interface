@@ -1,32 +1,78 @@
-import { ArrowLeft, Monitor } from "lucide-react";
-import { Link } from "react-router-dom";
-import AnimatedBackground from "@/components/AnimatedBackground";
+import { useState } from 'react';
+import { tvChannels, TVChannel, TVProgram } from '@/data/tvChannels';
+import LiveTVHome from '@/components/tv/LiveTVHome';
+import TVPlayer from '@/components/tv/TVPlayer';
+import ChannelListOverlay from '@/components/tv/ChannelListOverlay';
+import EPGGrid from '@/components/tv/EPGGrid';
+import ChannelSettings from '@/components/tv/ChannelSettings';
+
+type ViewMode = 'home' | 'player';
 
 const TV = () => {
-  return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
-      <AnimatedBackground accentColor="--tv" />
-      
-      <header className="relative z-10 p-6">
-        <Link 
-          to="/" 
-          className="inline-flex items-center gap-2 text-foreground/60 hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          <span>Back</span>
-        </Link>
-      </header>
+  const [viewMode, setViewMode] = useState<ViewMode>('home');
+  const [currentChannel, setCurrentChannel] = useState<TVChannel | null>(null);
+  const [showChannelList, setShowChannelList] = useState(false);
+  const [showEPG, setShowEPG] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
-      <main className="relative z-10 flex flex-col items-center justify-center min-h-[60vh] px-6">
-        <div className="text-tv mb-6">
-          <Monitor className="w-20 h-20" strokeWidth={1.5} />
-        </div>
-        <h1 className="text-4xl md:text-5xl font-bold mb-4 text-center">TV</h1>
-        <p className="text-foreground/60 text-lg text-center max-w-md">
-          Live TV and broadcast content at your fingertips.
-        </p>
-      </main>
-    </div>
+  const handleChannelSelect = (channel: TVChannel) => {
+    setCurrentChannel(channel);
+    setViewMode('player');
+    setShowChannelList(false);
+    setShowEPG(false);
+  };
+
+  const handleProgramSelect = (channel: TVChannel, program: TVProgram) => {
+    if (program.isLive) {
+      setCurrentChannel(channel);
+      setViewMode('player');
+      setShowEPG(false);
+    }
+  };
+
+  const handleBackToHome = () => {
+    setViewMode('home');
+    setCurrentChannel(null);
+  };
+
+  return (
+    <>
+      {viewMode === 'home' && (
+        <LiveTVHome
+          onChannelSelect={handleChannelSelect}
+          onViewAll={() => setShowSettings(true)}
+          onEditFavorites={() => setShowSettings(true)}
+        />
+      )}
+
+      {viewMode === 'player' && currentChannel && (
+        <TVPlayer
+          channel={currentChannel}
+          onOpenChannelList={() => setShowChannelList(true)}
+          onOpenEPG={() => setShowEPG(true)}
+          onBack={handleBackToHome}
+        />
+      )}
+
+      <ChannelListOverlay
+        isOpen={showChannelList}
+        onClose={() => setShowChannelList(false)}
+        onSelectChannel={handleChannelSelect}
+        currentChannel={currentChannel || undefined}
+      />
+
+      <EPGGrid
+        isOpen={showEPG}
+        onClose={() => setShowEPG(false)}
+        onSelectProgram={handleProgramSelect}
+        currentChannel={currentChannel || undefined}
+      />
+
+      <ChannelSettings
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+      />
+    </>
   );
 };
 
