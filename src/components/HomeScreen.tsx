@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, Wifi, Settings, LogOut, Users } from "lucide-react";
+import { ChevronDown, Settings, LogOut, Users } from "lucide-react";
 import breakingBadHeader from "@/assets/breaking_bad_header.png";
 import eldenRingHeader from "@/assets/elden_ring_header.png";
 import chillVibesHeader from "@/assets/chill_vibes_header.png";
@@ -153,16 +153,8 @@ const HomeScreen = ({ profile, onLogout }: HomeScreenProps) => {
             hafo
           </h1>
           
-          {/* Right Side - Status + Time/Date + Profile */}
+          {/* Right Side - Time/Date + Profile */}
           <div className="flex items-center gap-5">
-            {/* Status Indicators */}
-            <div className="flex items-center gap-3 text-foreground/40">
-              <Wifi className="w-4 h-4" strokeWidth={1.5} />
-              <Settings className="w-4 h-4 hover:text-foreground/60 cursor-pointer transition-colors" strokeWidth={1.5} onClick={() => setSettingsOpen(true)} />
-            </div>
-
-            {/* Subtle Divider */}
-            <div className="h-5 w-px bg-border/30 hidden sm:block" />
 
             {/* Discrete Time/Date Display */}
             <div className="text-right hidden sm:block">
