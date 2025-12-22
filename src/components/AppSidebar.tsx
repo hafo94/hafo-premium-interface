@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Film, Gamepad2, Monitor, Youtube, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -14,14 +15,15 @@ interface AppItem {
   icon: LucideIcon;
   color: string;
   hoverBg: string;
+  path: string;
 }
 
 const apps: AppItem[] = [
-  { id: "watch", name: "Watch", icon: Film, color: "text-nipflix", hoverBg: "hover:bg-nipflix/10" },
-  { id: "youtube", name: "YouTube", icon: Youtube, color: "text-youtube", hoverBg: "hover:bg-youtube/10" },
-  { id: "tv", name: "TV", icon: Monitor, color: "text-tv", hoverBg: "hover:bg-tv/10" },
-  { id: "retro", name: "Retro Gaming", icon: Gamepad2, color: "text-retro", hoverBg: "hover:bg-retro/10" },
-  { id: "steam", name: "Steam Link", icon: Monitor, color: "text-steam", hoverBg: "hover:bg-steam/10" },
+  { id: "watch", name: "Watch", icon: Film, color: "text-nipflix", hoverBg: "hover:bg-nipflix/10", path: "/watch" },
+  { id: "youtube", name: "YouTube", icon: Youtube, color: "text-youtube", hoverBg: "hover:bg-youtube/10", path: "/youtube" },
+  { id: "tv", name: "TV", icon: Monitor, color: "text-tv", hoverBg: "hover:bg-tv/10", path: "/tv" },
+  { id: "retro", name: "Retro Gaming", icon: Gamepad2, color: "text-retro", hoverBg: "hover:bg-retro/10", path: "/retro" },
+  { id: "steam", name: "Steam Link", icon: Monitor, color: "text-steam", hoverBg: "hover:bg-steam/10", path: "/steam" },
 ];
 
 interface AppSidebarProps {
@@ -30,8 +32,15 @@ interface AppSidebarProps {
 }
 
 const AppSidebar = ({ onAppHover, hoveredApp }: AppSidebarProps) => {
+  const navigate = useNavigate();
   const [focusedIndex, setFocusedIndex] = useState<number>(-1);
   const [hasFocus, setHasFocus] = useState(false);
+
+  const navigateToApp = useCallback((index: number) => {
+    if (index >= 0 && index < apps.length) {
+      navigate(apps[index].path);
+    }
+  }, [navigate]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (!hasFocus) return;
@@ -55,13 +64,10 @@ const AppSidebar = ({ onAppHover, hoveredApp }: AppSidebarProps) => {
         break;
       case "Enter":
         e.preventDefault();
-        if (focusedIndex >= 0 && focusedIndex < apps.length) {
-          // Trigger selection - ready for future navigation handlers
-          console.log(`Selected: ${apps[focusedIndex].name}`);
-        }
+        navigateToApp(focusedIndex);
         break;
     }
-  }, [hasFocus, focusedIndex, onAppHover]);
+  }, [hasFocus, focusedIndex, onAppHover, navigateToApp]);
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
@@ -112,6 +118,7 @@ const AppSidebar = ({ onAppHover, hoveredApp }: AppSidebarProps) => {
                       setFocusedIndex(index);
                     }}
                     onMouseLeave={() => onAppHover(null)}
+                    onClick={() => navigate(app.path)}
                   >
                     {/* Subtle glow on hover/focus */}
                     <div 

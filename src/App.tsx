@@ -5,6 +5,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Watch from "./pages/Watch";
+import YouTubePage from "./pages/YouTube";
+import TV from "./pages/TV";
+import RetroGaming from "./pages/RetroGaming";
+import SteamLink from "./pages/SteamLink";
 
 const queryClient = new QueryClient();
 
@@ -16,6 +21,11 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/watch" element={<Watch />} />
+          <Route path="/youtube" element={<YouTubePage />} />
+          <Route path="/tv" element={<TV />} />
+          <Route path="/retro" element={<RetroGaming />} />
+          <Route path="/steam" element={<SteamLink />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
