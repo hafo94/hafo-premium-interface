@@ -22,8 +22,7 @@ const apps: AppItem[] = [
   { id: "watch", name: "Watch", icon: Film, color: "text-nipflix", hoverBg: "hover:bg-nipflix/10", path: "/watch" },
   { id: "youtube", name: "YouTube", icon: Youtube, color: "text-youtube", hoverBg: "hover:bg-youtube/10", path: "/youtube" },
   { id: "tv", name: "TV", icon: Monitor, color: "text-tv", hoverBg: "hover:bg-tv/10", path: "/tv" },
-  { id: "retro", name: "Retro Gaming", icon: Gamepad2, color: "text-retro", hoverBg: "hover:bg-retro/10", path: "/retro" },
-  { id: "steam", name: "Steam Link", icon: Monitor, color: "text-steam", hoverBg: "hover:bg-steam/10", path: "/steam" },
+  { id: "gaming", name: "Gaming", icon: Gamepad2, color: "text-retro", hoverBg: "hover:bg-retro/10", path: "/gaming" },
 ];
 
 interface AppSidebarProps {
