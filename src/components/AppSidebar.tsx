@@ -1,3 +1,4 @@
+import { useState, useCallback, useEffect } from "react";
 import { Film, Gamepad2, Monitor, Youtube, LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -29,13 +30,70 @@ interface AppSidebarProps {
 }
 
 const AppSidebar = ({ onAppHover, hoveredApp }: AppSidebarProps) => {
+  const [focusedIndex, setFocusedIndex] = useState<number>(-1);
+  const [hasFocus, setHasFocus] = useState(false);
+
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (!hasFocus) return;
+
+    switch (e.key) {
+      case "ArrowDown":
+        e.preventDefault();
+        setFocusedIndex((prev) => {
+          const next = prev >= apps.length - 1 ? 0 : prev + 1;
+          onAppHover(apps[next].id);
+          return next;
+        });
+        break;
+      case "ArrowUp":
+        e.preventDefault();
+        setFocusedIndex((prev) => {
+          const next = prev <= 0 ? apps.length - 1 : prev - 1;
+          onAppHover(apps[next].id);
+          return next;
+        });
+        break;
+      case "Enter":
+        e.preventDefault();
+        if (focusedIndex >= 0 && focusedIndex < apps.length) {
+          // Trigger selection - ready for future navigation handlers
+          console.log(`Selected: ${apps[focusedIndex].name}`);
+        }
+        break;
+    }
+  }, [hasFocus, focusedIndex, onAppHover]);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
+
+  const handleFocus = () => {
+    setHasFocus(true);
+    if (focusedIndex === -1) {
+      setFocusedIndex(0);
+      onAppHover(apps[0].id);
+    }
+  };
+
+  const handleBlur = () => {
+    setHasFocus(false);
+  };
+
   return (
     <TooltipProvider delayDuration={200}>
-      <nav className="fixed left-0 top-0 h-full w-20 z-40 flex flex-col items-center py-8">
+      <nav 
+        className="fixed left-0 top-0 h-full w-20 z-40 flex flex-col items-center py-8 outline-none"
+        tabIndex={0}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+      >
         {/* App Icons */}
         <div className="flex flex-col items-center gap-1 mt-16">
-          {apps.map((app) => {
+          {apps.map((app, index) => {
             const isHovered = hoveredApp === app.id;
+            const isFocused = hasFocus && focusedIndex === index;
+            const isActive = isHovered || isFocused;
             const Icon = app.icon;
             
             return (
@@ -47,26 +105,29 @@ const AppSidebar = ({ onAppHover, hoveredApp }: AppSidebarProps) => {
                       "transition-all duration-300 ease-out",
                       "text-foreground/40",
                       app.hoverBg,
-                      isHovered && `${app.color} scale-110 bg-foreground/5`
+                      isActive && `${app.color} scale-110 bg-foreground/5`
                     )}
-                    onMouseEnter={() => onAppHover(app.id)}
+                    onMouseEnter={() => {
+                      onAppHover(app.id);
+                      setFocusedIndex(index);
+                    }}
                     onMouseLeave={() => onAppHover(null)}
                   >
-                    {/* Subtle glow on hover */}
+                    {/* Subtle glow on hover/focus */}
                     <div 
                       className={cn(
                         "absolute inset-0 rounded-xl transition-opacity duration-300",
-                        isHovered ? "opacity-100" : "opacity-0"
+                        isActive ? "opacity-100" : "opacity-0"
                       )}
                       style={{
-                        boxShadow: isHovered ? `0 0 20px hsl(var(--${app.id === 'series' ? 'nipflix' : app.id}) / 0.3)` : 'none'
+                        boxShadow: isActive ? `0 0 20px hsl(var(--${app.id === 'watch' ? 'nipflix' : app.id}) / 0.3)` : 'none'
                       }}
                     />
                     
                     <Icon 
                       className={cn(
                         "relative w-5 h-5 transition-all duration-300",
-                        isHovered && app.color
+                        isActive && app.color
                       )} 
                       strokeWidth={1.5} 
                     />
