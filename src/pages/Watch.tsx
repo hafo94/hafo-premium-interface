@@ -5,6 +5,7 @@ import AnimatedBackground from '@/components/AnimatedBackground';
 import ContentRow from '@/components/watch/ContentRow';
 import ContentDetail from '@/components/watch/ContentDetail';
 import FeaturedHero from '@/components/watch/FeaturedHero';
+import SearchOverlay from '@/components/watch/SearchOverlay';
 import { watchContent, contentCategories, WatchContent } from '@/data/watchContent';
 import { useMyList } from '@/hooks/useMyList';
 
@@ -22,6 +23,9 @@ const Watch = () => {
   
   // Detail view
   const [selectedContent, setSelectedContent] = useState<WatchContent | null>(null);
+  
+  // Search overlay
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Build categories including My List
   const visibleCategories = useMemo(() => {
@@ -62,9 +66,16 @@ const Watch = () => {
 
   // Handle keyboard navigation
   useEffect(() => {
-    if (selectedContent) return; // Don't handle if detail view is open
+    if (selectedContent || isSearchOpen) return; // Don't handle if modal is open
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Open search with 's' key
+      if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        setIsSearchOpen(true);
+        return;
+      }
+
       // If hero is active, let FeaturedHero handle left/right/enter
       if (focusedRow === -1 && (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'Enter')) {
         return;
@@ -109,7 +120,7 @@ const Watch = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedContent, focusedRow, focusedItems, visibleCategories]);
+  }, [selectedContent, isSearchOpen, focusedRow, focusedItems, visibleCategories]);
 
   const handleItemFocusChange = useCallback((rowIndex: number, itemIndex: number) => {
     setFocusedRow(rowIndex);
@@ -148,7 +159,11 @@ const Watch = () => {
           </div>
 
           <div className="flex items-center gap-4">
-            <button className="p-2 text-foreground/60 hover:text-foreground transition-colors">
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2 text-foreground/60 hover:text-foreground transition-colors"
+              title="Press 'S' to search"
+            >
               <Search className="w-5 h-5" />
             </button>
           </div>
@@ -195,6 +210,13 @@ const Watch = () => {
           ))}
         </div>
       </div>
+
+      {/* Search Overlay */}
+      <SearchOverlay
+        isOpen={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onSelect={setSelectedContent}
+      />
 
       {/* Detail Modal */}
       {selectedContent && (
