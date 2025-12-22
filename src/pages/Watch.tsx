@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { ArrowLeft, Search } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import AnimatedBackground from '@/components/AnimatedBackground';
@@ -6,8 +6,11 @@ import ContentRow from '@/components/watch/ContentRow';
 import ContentDetail from '@/components/watch/ContentDetail';
 import FeaturedHero from '@/components/watch/FeaturedHero';
 import { watchContent, contentCategories, WatchContent } from '@/data/watchContent';
+import { useMyList } from '@/hooks/useMyList';
 
 const Watch = () => {
+  const { myList, toggleInList, isInList } = useMyList();
+
   // Featured content - rotate through hot/recommended items
   const featuredItems = watchContent.filter(item => item.isHot || item.isRecommended);
   const [featuredIndex, setFeaturedIndex] = useState(0);
@@ -15,20 +18,39 @@ const Watch = () => {
 
   // Navigation state - -1 means hero is focused
   const [focusedRow, setFocusedRow] = useState(-1);
-  const [focusedItems, setFocusedItems] = useState<number[]>(
-    contentCategories.map(() => 0)
-  );
+  const [focusedItems, setFocusedItems] = useState<number[]>([]);
   
   // Detail view
   const [selectedContent, setSelectedContent] = useState<WatchContent | null>(null);
 
-  // Get visible categories (those with content)
-  const visibleCategories = contentCategories
-    .map((cat) => ({
-      ...cat,
-      items: cat.filter(watchContent),
-    }))
-    .filter((cat) => cat.items.length > 0);
+  // Build categories including My List
+  const visibleCategories = useMemo(() => {
+    const myListItems = watchContent.filter(item => myList.includes(item.id));
+    
+    const allCategories = [
+      // My List first if it has items
+      ...(myListItems.length > 0 ? [{
+        id: 'my-list',
+        title: 'My List',
+        items: myListItems,
+      }] : []),
+      // Then the other categories
+      ...contentCategories
+        .map((cat) => ({
+          id: cat.id,
+          title: cat.title,
+          items: cat.filter(watchContent),
+        }))
+        .filter((cat) => cat.items.length > 0),
+    ];
+    
+    return allCategories;
+  }, [myList]);
+
+  // Initialize focused items when categories change
+  useEffect(() => {
+    setFocusedItems(visibleCategories.map(() => 0));
+  }, [visibleCategories.length]);
 
   // Auto-rotate featured content
   useEffect(() => {
@@ -136,8 +158,10 @@ const Watch = () => {
         <FeaturedHero
           content={featuredContent}
           isActive={focusedRow === -1}
+          isInList={isInList(featuredContent.id)}
           onSelect={setSelectedContent}
           onInfo={setSelectedContent}
+          onToggleList={toggleInList}
         />
 
         {/* Featured indicators */}
@@ -176,6 +200,8 @@ const Watch = () => {
       {selectedContent && (
         <ContentDetail
           content={selectedContent}
+          isInList={isInList(selectedContent.id)}
+          onToggleList={toggleInList}
           onClose={() => setSelectedContent(null)}
         />
       )}

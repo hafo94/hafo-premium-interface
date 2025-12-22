@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { X, Play, Plus, ThumbsUp, ChevronDown, ChevronUp, Volume2 } from 'lucide-react';
+import { X, Play, Plus, Check, ThumbsUp, ChevronDown, ChevronUp, Volume2 } from 'lucide-react';
 import { WatchContent, Season, Episode } from '@/data/watchContent';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface ContentDetailProps {
   content: WatchContent;
+  isInList: boolean;
+  onToggleList: (id: string) => void;
   onClose: () => void;
 }
 
-const ContentDetail = ({ content, onClose }: ContentDetailProps) => {
+const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDetailProps) => {
   const [expandedSeason, setExpandedSeason] = useState<string | null>(
     content.seasons?.[0]?.id || null
   );
@@ -37,6 +38,8 @@ const ContentDetail = ({ content, onClose }: ContentDetailProps) => {
           e.preventDefault();
           if (buttons[focusedButton] === 'play') {
             // Play action
+          } else if (buttons[focusedButton] === 'add') {
+            onToggleList(content.id);
           }
           break;
       }
@@ -44,7 +47,7 @@ const ContentDetail = ({ content, onClose }: ContentDetailProps) => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, focusedButton]);
+  }, [onClose, focusedButton, content.id, onToggleList]);
 
   const formatRuntime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -118,12 +121,16 @@ const ContentDetail = ({ content, onClose }: ContentDetailProps) => {
                 {content.progress ? 'Resume' : 'Play'}
               </button>
               <button
+                onClick={() => onToggleList(content.id)}
                 className={cn(
-                  'p-2 rounded-full border-2 border-muted-foreground/50 hover:border-foreground transition-colors',
-                  focusedButton === 1 && 'ring-4 ring-foreground/50 border-foreground'
+                  'p-2 rounded-full border-2 transition-all',
+                  isInList 
+                    ? 'border-nipflix bg-nipflix/20 text-nipflix' 
+                    : 'border-muted-foreground/50 hover:border-foreground',
+                  focusedButton === 1 && 'ring-4 ring-foreground/50'
                 )}
               >
-                <Plus className="w-5 h-5" />
+                {isInList ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
               </button>
               <button
                 className={cn(
@@ -155,6 +162,12 @@ const ContentDetail = ({ content, onClose }: ContentDetailProps) => {
                 <span className="text-foreground">{content.year}</span>
                 <span className="text-muted-foreground">{formatRuntime(content.runtime)}</span>
                 <span className="px-1.5 py-0.5 border border-muted-foreground/50 text-xs rounded">HD</span>
+                {isInList && (
+                  <span className="flex items-center gap-1 text-nipflix text-xs font-medium">
+                    <Check className="w-3 h-3" />
+                    In My List
+                  </span>
+                )}
               </div>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 {content.plot}
