@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Star, Clock, Calendar, Play, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, Play, Plus, ThumbsUp, ChevronDown, ChevronUp, Volume2 } from 'lucide-react';
 import { WatchContent, Season, Episode } from '@/data/watchContent';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -13,7 +13,9 @@ const ContentDetail = ({ content, onClose }: ContentDetailProps) => {
   const [expandedSeason, setExpandedSeason] = useState<string | null>(
     content.seasons?.[0]?.id || null
   );
-  const [focusedElement, setFocusedElement] = useState<'close' | 'play' | 'season' | 'episode'>('play');
+  const [focusedButton, setFocusedButton] = useState(0);
+
+  const buttons = ['play', 'add', 'like', 'mute'];
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -23,12 +25,26 @@ const ContentDetail = ({ content, onClose }: ContentDetailProps) => {
           e.preventDefault();
           onClose();
           break;
+        case 'ArrowLeft':
+          e.preventDefault();
+          setFocusedButton((prev) => Math.max(0, prev - 1));
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          setFocusedButton((prev) => Math.min(buttons.length - 1, prev + 1));
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (buttons[focusedButton] === 'play') {
+            // Play action
+          }
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
+  }, [onClose, focusedButton]);
 
   const formatRuntime = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
@@ -40,134 +56,165 @@ const ContentDetail = ({ content, onClose }: ContentDetailProps) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8 overflow-y-auto">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-background/90 backdrop-blur-md"
+        className="fixed inset-0 bg-background/80 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Content */}
-      <div className="relative w-full max-w-4xl max-h-[90vh] mx-4 overflow-hidden rounded-2xl glass-strong animate-fade-in-scale">
-        {/* Backdrop image */}
-        <div className="absolute inset-0 -z-10">
+      {/* Modal */}
+      <div className="relative w-full max-w-3xl mx-4 bg-card rounded-lg overflow-hidden shadow-2xl animate-fade-in-scale">
+        {/* Hero Backdrop */}
+        <div className="relative aspect-video">
           <img
             src={content.backdrop}
             alt=""
-            className="w-full h-full object-cover opacity-20"
+            className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/80 to-transparent" />
-        </div>
+          <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
 
-        {/* Close button */}
-        <button
-          onClick={onClose}
-          className={cn(
-            'absolute top-4 right-4 z-10 p-2 rounded-full bg-background/50 hover:bg-background/70 transition-colors',
-            focusedElement === 'close' && 'ring-2 ring-nipflix'
-          )}
-        >
-          <X className="w-5 h-5" />
-        </button>
+          {/* Close button */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-2 rounded-full bg-card/80 hover:bg-card transition-colors"
+          >
+            <X className="w-6 h-6" />
+          </button>
 
-        <ScrollArea className="max-h-[90vh]">
-          <div className="p-8">
-            {/* Header */}
-            <div className="flex gap-6 mb-8">
-              {/* Poster */}
-              <div className="flex-shrink-0 w-48 aspect-[2/3] rounded-xl overflow-hidden shadow-elevated">
-                <img
-                  src={content.poster}
-                  alt={content.title}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+          {/* Title overlay */}
+          <div className="absolute bottom-0 left-0 right-0 p-6">
+            <p className="text-xs font-semibold text-nipflix tracking-widest mb-1">
+              {content.type === 'movie' ? 'FILM' : 'SERIES'}
+            </p>
+            <h1 className="text-3xl font-bold text-foreground tracking-wide mb-4">
+              {content.title.toUpperCase()}
+            </h1>
 
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <h1 className="text-3xl font-bold text-foreground mb-2">
-                  {content.title}
-                </h1>
-
-                <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-4">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-4 h-4" />
-                    <span>{content.year}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
-                    <span>
-                      {content.type === 'movie'
-                        ? formatRuntime(content.runtime)
-                        : `${content.runtime}m avg`}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                    <span className="text-foreground font-medium">
-                      {content.rating.toFixed(1)}
-                    </span>
-                    <span>/ 10</span>
-                  </div>
-                  <span className="px-2 py-0.5 bg-nipflix/20 text-nipflix rounded-full text-xs font-medium capitalize">
-                    {content.type}
-                  </span>
+            {/* Progress bar (if watching) */}
+            {content.progress && content.progress > 0 && (
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex-1 h-1 bg-muted/50 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-nipflix"
+                    style={{ width: `${content.progress}%` }}
+                  />
                 </div>
-
-                {/* Genres */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {content.genre.map((genre) => (
-                    <span
-                      key={genre}
-                      className="px-3 py-1 bg-secondary rounded-full text-xs font-medium"
-                    >
-                      {genre}
-                    </span>
-                  ))}
-                </div>
-
-                {/* Plot */}
-                <p className="text-muted-foreground leading-relaxed mb-6">
-                  {content.plot}
-                </p>
-
-                {/* Play button */}
-                <button
-                  className={cn(
-                    'flex items-center gap-2 px-6 py-3 bg-nipflix hover:bg-nipflix/90 text-foreground font-medium rounded-xl transition-colors',
-                    focusedElement === 'play' && 'ring-2 ring-foreground ring-offset-2 ring-offset-card'
-                  )}
-                >
-                  <Play className="w-5 h-5 fill-foreground" />
-                  <span>{content.type === 'movie' ? 'Play Movie' : 'Play S1 E1'}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Seasons & Episodes (for series) */}
-            {content.type === 'series' && content.seasons && (
-              <div className="border-t border-border pt-6">
-                <h2 className="text-xl font-semibold text-foreground mb-4">
-                  Seasons & Episodes
-                </h2>
-                <div className="space-y-3">
-                  {content.seasons.map((season) => (
-                    <SeasonAccordion
-                      key={season.id}
-                      season={season}
-                      isExpanded={expandedSeason === season.id}
-                      onToggle={() =>
-                        setExpandedSeason(
-                          expandedSeason === season.id ? null : season.id
-                        )
-                      }
-                    />
-                  ))}
-                </div>
+                <span className="text-sm text-muted-foreground">
+                  {Math.round((content.progress / 100) * content.runtime)}m of {formatRuntime(content.runtime)}
+                </span>
               </div>
             )}
+
+            {/* Action buttons */}
+            <div className="flex items-center gap-3">
+              <button
+                className={cn(
+                  'flex items-center gap-2 px-6 py-2 bg-foreground text-background font-semibold rounded transition-all',
+                  focusedButton === 0 && 'ring-4 ring-foreground/50'
+                )}
+              >
+                <Play className="w-5 h-5 fill-current" />
+                {content.progress ? 'Resume' : 'Play'}
+              </button>
+              <button
+                className={cn(
+                  'p-2 rounded-full border-2 border-muted-foreground/50 hover:border-foreground transition-colors',
+                  focusedButton === 1 && 'ring-4 ring-foreground/50 border-foreground'
+                )}
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+              <button
+                className={cn(
+                  'p-2 rounded-full border-2 border-muted-foreground/50 hover:border-foreground transition-colors',
+                  focusedButton === 2 && 'ring-4 ring-foreground/50 border-foreground'
+                )}
+              >
+                <ThumbsUp className="w-5 h-5" />
+              </button>
+              <div className="flex-1" />
+              <button
+                className={cn(
+                  'p-2 rounded-full border-2 border-muted-foreground/50 hover:border-foreground transition-colors',
+                  focusedButton === 3 && 'ring-4 ring-foreground/50 border-foreground'
+                )}
+              >
+                <Volume2 className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-        </ScrollArea>
+        </div>
+
+        {/* Content info */}
+        <div className="p-6">
+          <div className="flex gap-8 mb-6">
+            {/* Left column - metadata */}
+            <div className="flex-1">
+              <div className="flex items-center gap-3 text-sm mb-4">
+                <span className="text-foreground">{content.year}</span>
+                <span className="text-muted-foreground">{formatRuntime(content.runtime)}</span>
+                <span className="px-1.5 py-0.5 border border-muted-foreground/50 text-xs rounded">HD</span>
+              </div>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                {content.plot}
+              </p>
+            </div>
+
+            {/* Right column - genres */}
+            <div className="w-48 text-sm">
+              <p className="text-muted-foreground mb-2">
+                <span className="text-foreground/60">Genres: </span>
+                {content.genre.join(', ')}
+              </p>
+              <p className="text-muted-foreground">
+                <span className="text-foreground/60">Rating: </span>
+                {content.rating}/10
+              </p>
+            </div>
+          </div>
+
+          {/* Seasons & Episodes (for series) */}
+          {content.type === 'series' && content.seasons && (
+            <div className="border-t border-border pt-6">
+              <h2 className="text-lg font-semibold text-foreground mb-4">
+                Episodes
+              </h2>
+              <div className="space-y-2">
+                {content.seasons.map((season) => (
+                  <SeasonAccordion
+                    key={season.id}
+                    season={season}
+                    isExpanded={expandedSeason === season.id}
+                    onToggle={() =>
+                      setExpandedSeason(
+                        expandedSeason === season.id ? null : season.id
+                      )
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* More Like This */}
+          <div className="border-t border-border pt-6 mt-6">
+            <h2 className="text-lg font-semibold text-foreground mb-4">
+              More Like This
+            </h2>
+            <div className="grid grid-cols-3 gap-3">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="aspect-video bg-muted rounded-md overflow-hidden">
+                  <img
+                    src={`https://images.unsplash.com/photo-${1500000000000 + i * 100000}?w=300&h=170&fit=crop`}
+                    alt=""
+                    className="w-full h-full object-cover opacity-50"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -181,10 +228,10 @@ interface SeasonAccordionProps {
 
 const SeasonAccordion = ({ season, isExpanded, onToggle }: SeasonAccordionProps) => {
   return (
-    <div className="bg-secondary/50 rounded-xl overflow-hidden">
+    <div className="bg-secondary/30 rounded-lg overflow-hidden">
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-secondary/70 transition-colors"
+        className="w-full flex items-center justify-between p-4 hover:bg-secondary/50 transition-colors"
       >
         <span className="font-medium">Season {season.number}</span>
         <div className="flex items-center gap-2">
@@ -216,13 +263,13 @@ interface EpisodeRowProps {
 
 const EpisodeRow = ({ episode }: EpisodeRowProps) => {
   return (
-    <button className="w-full flex items-start gap-4 p-4 hover:bg-accent/50 transition-colors text-left group">
-      <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center group-hover:bg-nipflix transition-colors">
-        <Play className="w-4 h-4 fill-foreground" />
+    <button className="w-full flex items-start gap-4 p-4 hover:bg-accent/30 transition-colors text-left group">
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted/50 flex items-center justify-center group-hover:bg-nipflix transition-colors">
+        <Play className="w-3 h-3 fill-foreground" />
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-muted-foreground text-sm">E{episode.number}</span>
+          <span className="text-muted-foreground text-sm">{episode.number}</span>
           <span className="font-medium text-foreground">{episode.title}</span>
         </div>
         <p className="text-sm text-muted-foreground line-clamp-2">{episode.plot}</p>
