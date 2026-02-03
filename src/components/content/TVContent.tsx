@@ -1,9 +1,10 @@
 import { useState, useCallback } from "react";
-import { tvChannels, TVChannel, categoryLabels, getCategoryCount } from "@/data/tvChannels";
+import { tvChannels, TVChannel, TVProgram, categoryLabels, getCategoryCount } from "@/data/tvChannels";
 import { useTVHomeChannels } from "@/hooks/useTVHomeChannels";
 import ChannelCard from "@/components/tv/ChannelCard";
 import TVPlayer from "@/components/tv/TVPlayer";
 import ChannelListOverlay from "@/components/tv/ChannelListOverlay";
+import EPGGrid from "@/components/tv/EPGGrid";
 import TVHomeSettings from "@/components/tv/TVHomeSettings";
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ const TVContent = ({ activeSection }: TVContentProps) => {
   const { homeChannels, iconSize, isOnHome } = useTVHomeChannels();
   const [selectedChannel, setSelectedChannel] = useState<TVChannel | null>(null);
   const [showChannelList, setShowChannelList] = useState(false);
+  const [showEPG, setShowEPG] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
@@ -28,21 +30,43 @@ const TVContent = ({ activeSection }: TVContentProps) => {
   const handleChannelSelect = useCallback((channel: TVChannel) => {
     setSelectedChannel(channel);
     setShowChannelList(false);
+    setShowEPG(false);
   }, []);
 
   const handleClosePlayer = useCallback(() => {
     setSelectedChannel(null);
   }, []);
 
+  const handleProgramSelect = useCallback((channel: TVChannel, program: TVProgram) => {
+    if (program.isLive) {
+      handleChannelSelect(channel);
+    }
+  }, [handleChannelSelect]);
+
   // If watching a channel, show the player
   if (selectedChannel) {
     return (
-      <TVPlayer
-        channel={selectedChannel}
-        onOpenChannelList={() => setShowChannelList(true)}
-        onOpenEPG={() => {}}
-        onBack={handleClosePlayer}
-      />
+      <>
+        <TVPlayer
+          channel={selectedChannel}
+          onOpenChannelList={() => setShowChannelList(true)}
+          onOpenEPG={() => setShowEPG(true)}
+          onBack={handleClosePlayer}
+          onChannelChange={handleChannelSelect}
+        />
+        <ChannelListOverlay
+          isOpen={showChannelList}
+          onClose={() => setShowChannelList(false)}
+          onSelectChannel={handleChannelSelect}
+          currentChannel={selectedChannel}
+        />
+        <EPGGrid
+          isOpen={showEPG}
+          onClose={() => setShowEPG(false)}
+          onSelectProgram={handleProgramSelect}
+          currentChannel={selectedChannel}
+        />
+      </>
     );
   }
 
