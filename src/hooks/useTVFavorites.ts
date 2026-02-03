@@ -5,7 +5,7 @@ const STORAGE_KEY = 'tv-favorites';
 export const useTVFavorites = () => {
   const [favorites, setFavorites] = useState<string[]>(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : ['espn', 'hbo', 'bbc-news', 'discovery'];
+    return stored ? JSON.parse(stored) : ['svt1', 'svt2', 'tv4', 'tv3'];
   });
 
   useEffect(() => {

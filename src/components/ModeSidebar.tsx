@@ -6,7 +6,7 @@ import {
   Film,
   Tv,
   Clapperboard,
-  Heart,
+  List,
   LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -30,7 +30,7 @@ const sidebarConfig: Record<AppMode, SidebarItem[]> = {
   tv: [
     { id: "search", icon: Search, label: "Search" },
     { id: "home", icon: Home, label: "Home" },
-    { id: "favorites", icon: Heart, label: "Favorites" },
+    { id: "all-channels", icon: List, label: "All Channels" },
   ],
   games: [], // Empty = hidden sidebar
 };
