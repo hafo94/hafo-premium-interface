@@ -1,148 +1,138 @@
 
-# Unified Streaming Interface Redesign
+# TV Player Fullscreen UI Improvements
 
 ## Overview
-Transform the app to launch directly into a unified main interface with three modes (Movies, TV, Games) accessible via top header tabs. The left sidebar will adapt dynamically based on the selected mode, and we'll remove all music-related content.
+Enhance the TV Player with proper fullscreen controls including a visible back button, play/pause functionality, and fix various UI issues to create a polished viewing experience.
 
-## New Architecture
+## Current Issues Found
+
+| Issue | Description |
+|-------|-------------|
+| No back button | ESC key works but no visible back arrow in top-left |
+| No play/pause | Essential control is completely missing |
+| Settings button broken | Has no onClick handler |
+| Progress bar unstable | Random value changes on every render |
+| No channel prev/next | Only full channel list via ArrowUp |
+| EPG won't open | Callback is empty in TVContent |
+| No volume slider | Only mute toggle exists |
+
+## Proposed Changes
+
+### 1. Add Top-Left Back Button
+- Add a back arrow button in the top-left corner
+- Shows on overlay visible, matches the overlay fade animation
+- Uses `ArrowLeft` or custom back icon
+- Clickable for mouse/remote users
+
+### 2. Add Play/Pause Control
+- Add large center play/pause button (appears briefly on tap/click)
+- Add play/pause in bottom control bar
+- Toggle with Space key
+- State: `isPaused` boolean
+
+### 3. Add Channel Navigation
+- Previous/Next channel buttons in the control bar
+- Channel Up/Down with dedicated buttons
+- Keyboard shortcuts: Page Up / Page Down for quick channel switch
+
+### 4. Fix Settings Button
+- Connect to a settings panel or quality selector
+- Options: Video quality, Closed captions, Audio track
+
+### 5. Fix Progress Bar
+- Calculate progress based on program start/end time
+- Use `useMemo` or `useState` to prevent re-renders
+- Show actual program progress percentage
+
+### 6. Enable EPG Opening
+- Fix the empty callback in TVContent
+- Pass proper `setShowEPG` state handler
+
+### 7. Add Fullscreen Toggle
+- Button in control bar to toggle browser fullscreen
+- Use `document.fullscreenElement` API
+
+## File Changes
+
+### `src/components/tv/TVPlayer.tsx`
+- Add back arrow button (top-left, visible with overlay)
+- Add play/pause state and controls
+- Add channel prev/next navigation
+- Add fullscreen toggle
+- Fix progress bar to use stable calculation
+- Add more keyboard shortcuts (Space, Page Up/Down)
+- Connect settings button to quality panel
+
+### `src/components/content/TVContent.tsx`
+- Fix EPG callback to properly open EPG grid
+- Add state for EPG visibility
+
+## New UI Layout
 
 ```text
-+------------------------------------------+
-|  [Movies]  [TV]  [Games]      hafo  12:30|
-+--------+---------------------------------+
-|  SIDE  |                                 |
-|  BAR   |    MAIN CONTENT AREA            |
-|        |    (adapts per mode)            |
-| Search |                                 |
-| Home   |    [Featured Hero]              |
-| ...    |                                 |
-|        |    [Content Rows]               |
-+--------+---------------------------------+
++--------------------------------------------------+
+|  [<- Back]                    [CH 1] LIVE (mini) |
+|                                                  |
+|                                                  |
+|                   [PLAY/PAUSE]                   |
+|                   (center tap)                   |
+|                                                  |
+|                                                  |
++--------------------------------------------------+
+| [Progress Bar ============================----] |
+|                                                  |
+| 1 [SVT1] SVT1                                    |
+|   * LIVE   Aktuellt                              |
+|   20:00 - 20:30  |  News Program                 |
+|                                                  |
+| [<CH] [CH>]  [Mute] [Settings] [Fullscreen]      |
+|                                                  |
+| ^ Channels  v Guide  SPACE Play/Pause  ESC Exit  |
++--------------------------------------------------+
 ```
 
-## Changes Summary
+## Keyboard Shortcuts (Updated)
+- **ESC / Backspace**: Exit player, go back
+- **Space**: Play/Pause toggle
+- **M**: Mute/Unmute
+- **Arrow Up**: Open channel list
+- **Arrow Down**: Open EPG guide
+- **Page Up**: Previous channel
+- **Page Down**: Next channel
+- **F**: Toggle fullscreen
+- **Left/Right**: Seek (future, for VOD)
 
-### 1. Remove Welcome/Profile System
-- **File**: `src/pages/Index.tsx`
-- Remove WelcomeScreen and ProfileSelection flow
-- Launch directly into new unified home component
-- Remove sessionStorage profile logic
+## Technical Notes
 
-### 2. Create New Unified Home Component
-- **New File**: `src/components/UnifiedHome.tsx`
-- Three-mode state: `movies` | `tv` | `games`
-- Top header with mode toggle tabs (styled as premium pills)
-- Dynamic sidebar that changes based on mode
-- Content area that renders mode-specific content
-
-### 3. Create Mode-Aware Sidebar
-- **New File**: `src/components/ModeSidebar.tsx`
-- Movies mode: Search, Home, Trending, Movies, Series, On Cinema
-- TV mode: Search, Home, Favorites
-- Games mode: No sidebar (hidden)
-- Smooth transition animations between modes
-
-### 4. Mode-Specific Content Areas
-- **Movies Mode**: Reuse existing Watch page components (FeaturedHero, ContentRow, etc.)
-- **TV Mode**: Embed the existing LiveTVHome content
-- **Games Mode**: Show the Gaming page content (Retro/Steam buttons)
-
-### 5. Cleanup
-- Remove `src/components/WelcomeScreen.tsx` (no longer used)
-- Remove `src/components/ProfileSelection.tsx` (no longer used)
-- Update `src/components/HomeScreen.tsx` - remove music content from featured items
-- Remove Spotify/music references from theme and components
-
-### 6. Route Updates
-- **File**: `src/App.tsx`
-- Keep existing routes but they may become less used
-- Main experience is now on `/`
-
----
-
-## Technical Details
-
-### Mode State Structure
+### Progress Calculation
 ```typescript
-type AppMode = 'movies' | 'tv' | 'games';
-
-// Sidebar items per mode
-const sidebarConfig = {
-  movies: [
-    { id: 'search', icon: Search, label: 'Search' },
-    { id: 'home', icon: Home, label: 'Home' },
-    { id: 'trending', icon: TrendingUp, label: 'Trending' },
-    { id: 'movies', icon: Film, label: 'Movies' },
-    { id: 'series', icon: Tv, label: 'Series' },
-    { id: 'cinema', icon: Clapperboard, label: 'On Cinema' },
-  ],
-  tv: [
-    { id: 'search', icon: Search, label: 'Search' },
-    { id: 'home', icon: Home, label: 'Home' },
-    { id: 'favorites', icon: Heart, label: 'Favorites' },
-  ],
-  games: [] // Empty = hidden sidebar
+const getProgress = () => {
+  const now = new Date();
+  const [startH, startM] = channel.currentProgram.startTime.split(':').map(Number);
+  const [endH, endM] = channel.currentProgram.endTime.split(':').map(Number);
+  
+  const start = startH * 60 + startM;
+  const end = endH * 60 + endM;
+  const current = now.getHours() * 60 + now.getMinutes();
+  
+  return Math.min(100, Math.max(0, ((current - start) / (end - start)) * 100));
 };
 ```
 
-### Top Header Mode Tabs
-- Three premium-styled pill buttons: Movies / TV / Games
-- Active state with accent color glow
-- Keyboard navigable (left/right arrows)
-- hafo logo and time display remain on right side
+### Fullscreen API
+```typescript
+const toggleFullscreen = () => {
+  if (document.fullscreenElement) {
+    document.exitFullscreen();
+  } else {
+    document.documentElement.requestFullscreen();
+  }
+};
+```
 
-### Accent Colors Per Mode
-- Movies: `--nipflix` (red)
-- TV: `--tv` (blue)
-- Games: `--retro` (purple)
-
-### Content Integration
-
-**Movies Mode:**
-- Use `watchContent` data from existing Watch page
-- Display FeaturedHero with movie/series content
-- ContentRows for categories (Trending, Continue Watching, etc.)
-
-**TV Mode:**
-- Show favorites section with channel cards
-- "All Channels" quick access
-- Player integration when channel selected
-
-**Games Mode:**
-- Show the two large buttons (Retro Games, Steam Link)
-- No sidebar - full width content
-- Keep existing navigation to `/retro` and `/steam`
-
----
-
-## Files to Create
-1. `src/components/UnifiedHome.tsx` - Main unified interface
-2. `src/components/ModeSidebar.tsx` - Dynamic sidebar component
-3. `src/components/ModeHeader.tsx` - Top header with mode tabs
-
-## Files to Modify
-1. `src/pages/Index.tsx` - Simplify to render UnifiedHome directly
-2. `src/components/HomeScreen.tsx` - Remove music from featured content
-3. `src/index.css` - Add any new transition animations
-
-## Files to Delete (Optional)
-- `src/components/WelcomeScreen.tsx`
-- `src/components/ProfileSelection.tsx`
-- `src/components/AppSidebar.tsx` (replaced by ModeSidebar)
-
----
-
-## Keyboard Navigation
-- **Tab/Arrow keys** between mode tabs in header
-- **Arrow keys** navigate sidebar items
-- **Enter** to select/activate
-- **Escape** to close overlays
-- Mode-specific shortcuts (e.g., 'S' for search in Movies mode)
-
-## Visual Design Notes
-- Dark theme maintained throughout
-- Glassmorphism for sidebar and header elements
-- Smooth 300ms transitions between modes
-- Active mode tab has subtle glow matching mode's accent color
-- Sidebar width: ~200px expanded, hidden in Games mode
-- Content area adjusts padding based on sidebar presence
+## Visual Design
+- Back button: Semi-transparent pill with arrow icon
+- Play/Pause: Large centered button (like YouTube)
+- Channel buttons: Match existing control button style
+- All buttons have hover states and focus rings for TV navigation
+- Consistent with the premium dark glassmorphism theme
