@@ -32,13 +32,16 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
   const [searchTypeIndex, setSearchTypeIndex] = useState(0); // 0 = content, 1 = person
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Debounce search term
+  // Debounce search term - reduced for faster response
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedTerm(searchTerm);
-    }, 300);
+    }, 150);
     return () => clearTimeout(timer);
   }, [searchTerm]);
+
+  // Track if we're waiting for debounce (immediate visual feedback)
+  const isWaitingForDebounce = searchTerm !== debouncedTerm && searchTerm.trim().length > 0;
 
   // Use TMDB search hooks
   const { data: tmdbResults, isLoading: isSearchingContent } = useTMDBSearch(
@@ -51,7 +54,7 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
     selectedPerson?.id
   );
 
-  const isSearching = isSearchingContent || isSearchingPerson || isLoadingCredits;
+  const isSearching = isWaitingForDebounce || isSearchingContent || isSearchingPerson || isLoadingCredits;
 
   // Filter content based on search term - fallback to local data if no TMDB results
   const filteredContent = useMemo(() => {
