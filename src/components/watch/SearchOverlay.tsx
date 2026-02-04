@@ -465,11 +465,18 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
                               : 'bg-muted/20 hover:bg-muted/40'
                           )}
                         >
-                          {person.profile_path ? (
+                        {person.profile_path ? (
                             <img
                               src={`https://image.tmdb.org/t/p/w185${person.profile_path}`}
                               alt={person.name}
-                              className="w-16 h-20 rounded-lg object-cover"
+                              className="w-16 h-20 rounded-lg object-cover transition-opacity duration-300 bg-muted/50"
+                              style={{ opacity: 0 }}
+                              onLoad={(e) => {
+                                (e.target as HTMLImageElement).style.opacity = '1';
+                              }}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.opacity = '1';
+                              }}
                             />
                           ) : (
                             <div className="w-16 h-20 rounded-lg bg-muted/50 flex items-center justify-center">
@@ -534,7 +541,7 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
                           }}
                           className={cn(
                             'relative aspect-video rounded-lg overflow-hidden transition-all duration-200',
-                            'group focus:outline-none',
+                            'group focus:outline-none bg-muted/50',
                             isFocused
                               ? 'ring-4 ring-nipflix scale-105 z-10'
                               : 'hover:ring-2 hover:ring-foreground/50'
@@ -543,9 +550,14 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
                           <img
                             src={item.backdrop || item.poster}
                             alt={item.title}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-opacity duration-300"
+                            style={{ opacity: 0 }}
+                            onLoad={(e) => {
+                              (e.target as HTMLImageElement).style.opacity = '1';
+                            }}
                             onError={(e) => {
                               (e.target as HTMLImageElement).src = '/placeholder.svg';
+                              (e.target as HTMLImageElement).style.opacity = '1';
                             }}
                           />
                           <div

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { tmdbService, TMDBPerson, TMDBPersonCredits } from "@/services/tmdbService";
 import { 
   transformTMDBMovie, 
@@ -146,6 +146,7 @@ export const useTMDBSearch = (query: string, page = 1) => {
     },
     enabled: query.trim().length > 0,
     staleTime: STALE_TIME,
+    placeholderData: keepPreviousData,
   });
 };
 
@@ -250,6 +251,7 @@ export const useTMDBPersonSearch = (query: string, page = 1) => {
     },
     enabled: query.trim().length > 0,
     staleTime: STALE_TIME,
+    placeholderData: keepPreviousData,
   });
 };
 
