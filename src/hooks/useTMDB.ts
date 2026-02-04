@@ -8,6 +8,7 @@ import {
   transformTMDBSeriesDetails 
 } from "@/services/tmdbTransformer";
 import { WatchContent } from "@/data/watchContent";
+import { getMovieGenreTmdbId, getSeriesGenreTmdbId } from "@/data/genreConfig";
 
 // Cache times
 const STALE_TIME = 1000 * 60 * 15; // 15 minutes
@@ -138,6 +139,37 @@ export const useTMDBSearch = (query: string, page = 1) => {
         .filter((item): item is WatchContent => item !== null);
     },
     enabled: query.trim().length > 0,
+    staleTime: STALE_TIME,
+  });
+};
+
+// Genre-based discovery hooks
+export const useMoviesByGenre = (genreId: string | undefined, page = 1) => {
+  const tmdbGenreId = genreId ? getMovieGenreTmdbId(genreId) : undefined;
+  
+  return useQuery({
+    queryKey: ["tmdb", "discover-movies", genreId, page],
+    queryFn: async () => {
+      if (!tmdbGenreId) throw new Error("Invalid genre");
+      const response = await tmdbService.discoverMovies(tmdbGenreId, page);
+      return response.results.map(transformTMDBMovie);
+    },
+    enabled: !!tmdbGenreId,
+    staleTime: STALE_TIME,
+  });
+};
+
+export const useSeriesByGenre = (genreId: string | undefined, page = 1) => {
+  const tmdbGenreId = genreId ? getSeriesGenreTmdbId(genreId) : undefined;
+  
+  return useQuery({
+    queryKey: ["tmdb", "discover-series", genreId, page],
+    queryFn: async () => {
+      if (!tmdbGenreId) throw new Error("Invalid genre");
+      const response = await tmdbService.discoverSeries(tmdbGenreId, page);
+      return response.results.map(transformTMDBSeries);
+    },
+    enabled: !!tmdbGenreId,
     staleTime: STALE_TIME,
   });
 };

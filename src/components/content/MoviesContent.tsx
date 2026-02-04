@@ -6,8 +6,9 @@ import SearchOverlay from "@/components/watch/SearchOverlay";
 import { WatchContent } from "@/data/watchContent";
 import { useMyList } from "@/hooks/useMyList";
 import { useFocus } from "@/contexts/FocusContext";
-import { useMoviesPageData } from "@/hooks/useTMDB";
+import { useMoviesPageData, useMoviesByGenre, usePopularMovies, useNowPlayingMovies } from "@/hooks/useTMDB";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getMovieGenreLabel } from "@/data/genreConfig";
 
 interface MoviesContentProps {
   activeSection: string;
@@ -18,13 +19,29 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
 
-  // Fetch TMDB data
-  const { popularMovies, trendingMovies, topRatedMovies, nowPlaying, isLoading, error } = useMoviesPageData();
+  // Determine if a genre is selected
+  const isGenreSelected = activeSection.startsWith("genre-");
+  const selectedGenreId = isGenreSelected ? activeSection.replace("genre-", "") : undefined;
+
+  // Fetch TMDB data for home view
+  const { popularMovies, trendingMovies, topRatedMovies, nowPlaying, isLoading: homeLoading, error: homeError } = useMoviesPageData();
+  
+  // Fetch popular movies for "popular" section
+  const { data: popularData, isLoading: popularLoading, error: popularError } = usePopularMovies(1);
+  
+  // Fetch now playing for "cinema" section  
+  const { data: cinemaData, isLoading: cinemaLoading, error: cinemaError } = useNowPlayingMovies(1);
+
+  // Fetch genre-specific data
+  const { data: genreMovies, isLoading: genreLoading, error: genreError } = useMoviesByGenre(selectedGenreId);
 
   // Featured content - use trending movies for hero
   const featuredItems = useMemo(() => {
+    if (isGenreSelected && genreMovies) {
+      return genreMovies.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
+    }
     return trendingMovies.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
-  }, [trendingMovies]);
+  }, [trendingMovies, genreMovies, isGenreSelected]);
 
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featuredContent = featuredItems[featuredIndex] || featuredItems[0];
@@ -42,11 +59,52 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     }
   }, [activeSection]);
 
-  // Build categories including My List
+  // Reset featured index when section changes
+  useEffect(() => {
+    setFeaturedIndex(0);
+  }, [activeSection]);
+
+  // Build categories based on active section
   const visibleCategories = useMemo(() => {
     const allMovies = [...popularMovies, ...trendingMovies, ...topRatedMovies, ...nowPlaying];
     const myListItems = allMovies.filter((item) => myList.includes(item.id));
 
+    // Genre view
+    if (isGenreSelected && genreMovies) {
+      const genreLabel = getMovieGenreLabel(selectedGenreId || "");
+      return [
+        ...(myListItems.length > 0
+          ? [{ id: "my-list", title: "My List", items: myListItems }]
+          : []),
+        { id: "genre-results", title: `${genreLabel} Movies`, items: genreMovies },
+      ];
+    }
+
+    // Popular section
+    if (activeSection === "popular") {
+      return [
+        ...(myListItems.length > 0
+          ? [{ id: "my-list", title: "My List", items: myListItems }]
+          : []),
+        ...(popularData && popularData.length > 0
+          ? [{ id: "popular", title: "Popular Movies", items: popularData }]
+          : []),
+      ];
+    }
+
+    // On Cinema section
+    if (activeSection === "cinema") {
+      return [
+        ...(myListItems.length > 0
+          ? [{ id: "my-list", title: "My List", items: myListItems }]
+          : []),
+        ...(cinemaData && cinemaData.length > 0
+          ? [{ id: "now-playing", title: "Now Playing in Cinemas", items: cinemaData }]
+          : []),
+      ];
+    }
+
+    // Home view (default)
     const categories = [
       ...(myListItems.length > 0
         ? [{ id: "my-list", title: "My List", items: myListItems }]
@@ -66,7 +124,7 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     ];
 
     return categories;
-  }, [myList, popularMovies, trendingMovies, topRatedMovies, nowPlaying]);
+  }, [myList, popularMovies, trendingMovies, topRatedMovies, nowPlaying, isGenreSelected, genreMovies, selectedGenreId, activeSection, popularData, cinemaData]);
 
   // Auto-rotate featured content
   useEffect(() => {
@@ -158,6 +216,10 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     },
     [setActiveZone, setContentIndex]
   );
+
+  // Determine loading state
+  const isLoading = homeLoading || (isGenreSelected && genreLoading) || (activeSection === "popular" && popularLoading) || (activeSection === "cinema" && cinemaLoading);
+  const error = homeError || genreError || popularError || cinemaError;
 
   // Loading skeleton
   if (isLoading) {
