@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Play, Plus, Check, ThumbsUp, ChevronDown, ChevronUp, Volume2 } from 'lucide-react';
 import { WatchContent, Season, Episode } from '@/data/watchContent';
 import { cn } from '@/lib/utils';
+import { useMovieDetails, useSeriesDetails } from '@/hooks/useTMDB';
 
 interface ContentDetailProps {
   content: WatchContent;
@@ -16,6 +17,17 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   );
   const [focusedButton, setFocusedButton] = useState(0);
   const contentScrollRef = React.useRef<HTMLDivElement>(null);
+
+  // Fetch full details including similar content
+  const { data: movieDetails } = useMovieDetails(
+    content.type === 'movie' ? content.tmdbId : undefined
+  );
+  const { data: seriesDetails } = useSeriesDetails(
+    content.type === 'series' ? content.tmdbId : undefined
+  );
+
+  // Use enriched content with similar data when available
+  const enrichedContent = movieDetails || seriesDetails || content;
 
   const buttons = ['play', 'add', 'like', 'mute'];
 
@@ -228,17 +240,29 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
             <h2 className="text-lg font-semibold text-foreground mb-4">
               More Like This
             </h2>
-            <div className="grid grid-cols-3 gap-3">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="aspect-video bg-muted rounded-md overflow-hidden">
-                  <img
-                    src={`https://images.unsplash.com/photo-${1500000000000 + i * 100000}?w=300&h=170&fit=crop`}
-                    alt=""
-                    className="w-full h-full object-cover opacity-50"
-                  />
-                </div>
-              ))}
-            </div>
+            {enrichedContent.similarContent && enrichedContent.similarContent.length > 0 ? (
+              <div className="grid grid-cols-3 gap-3">
+                {enrichedContent.similarContent.slice(0, 6).map((item) => (
+                  <div
+                    key={item.id}
+                    className="aspect-video bg-muted rounded-md overflow-hidden relative group cursor-pointer"
+                  >
+                    <img
+                      src={item.backdrop || item.poster}
+                      alt={item.title}
+                      className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
+                      <span className="text-xs font-medium text-white line-clamp-2">
+                        {item.title}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">No similar content available</p>
+            )}
           </div>
         </div>
       </div>
