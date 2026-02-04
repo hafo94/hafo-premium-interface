@@ -57,10 +57,15 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
     setSidebarIndex, 
     focusHeader, 
     focusContent,
-    setActiveZone 
+    setActiveZone,
+    isSidebarExpanded
   } = useFocus();
 
   const isSidebarFocused = activeZone === "sidebar";
+  const [isHovered, setIsHovered] = useState(false);
+  
+  // Sidebar expands when focused or hovered
+  const isExpanded = isSidebarExpanded || isHovered;
 
   // If no items, don't render
   if (items.length === 0) {
@@ -130,12 +135,15 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
 
   return (
     <aside
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        "fixed left-0 top-0 h-full w-52 z-40",
-        "flex flex-col pt-20 pb-8 px-4",
+        "fixed left-0 top-0 h-full z-40",
+        "flex flex-col pt-20 pb-8",
         "transition-all duration-300 ease-out",
         "bg-gradient-to-b from-background/80 via-background/60 to-background/80",
-        "backdrop-blur-xl border-r border-border/20"
+        "backdrop-blur-xl border-r border-border/20",
+        isExpanded ? "w-52 px-4" : "w-16 px-2"
       )}
     >
       {/* Navigation Items */}
@@ -159,9 +167,10 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
                 }
               }}
               className={cn(
-                "relative flex items-center gap-3 px-4 py-3 rounded-xl",
+                "relative flex items-center rounded-xl",
                 "text-sm font-medium transition-all duration-200",
                 "outline-none",
+                isExpanded ? "gap-3 px-4 py-3" : "justify-center px-2 py-3",
                 isActive
                   ? `text-${color} bg-${color}/10`
                   : isFocused
@@ -176,10 +185,10 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
               }}
             >
               <Icon
-                className={cn("w-5 h-5", isActive && `text-${color}`)}
+                className={cn("w-5 h-5 flex-shrink-0", isActive && `text-${color}`)}
                 strokeWidth={1.5}
               />
-              <span>{item.label}</span>
+              {isExpanded && <span className="whitespace-nowrap">{item.label}</span>}
 
               {/* Active indicator */}
               {isActive && (
@@ -203,12 +212,14 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
         })}
       </nav>
 
-      {/* Keyboard hint */}
-      <div className="mt-auto pt-4 border-t border-border/20">
-        <p className="text-xs text-muted-foreground/50 text-center">
-          ↑↓ Navigate • → Content • Enter Select
-        </p>
-      </div>
+      {/* Keyboard hint - only show when expanded */}
+      {isExpanded && (
+        <div className="mt-auto pt-4 border-t border-border/20">
+          <p className="text-xs text-muted-foreground/50 text-center">
+            ↑↓ Navigate • → Content • Enter Select
+          </p>
+        </div>
+      )}
     </aside>
   );
 };

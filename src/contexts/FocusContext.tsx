@@ -15,6 +15,7 @@ interface FocusContextValue {
   headerIndex: number;
   sidebarIndex: number;
   contentIndex: { row: number; col: number };
+  isSidebarExpanded: boolean;
   
   setActiveZone: (zone: FocusZone) => void;
   setHeaderIndex: (index: number) => void;
@@ -40,6 +41,12 @@ export const FocusProvider = ({ children, mode, hasSidebar }: FocusProviderProps
   const [headerIndex, setHeaderIndex] = useState(0);
   const [sidebarIndex, setSidebarIndex] = useState(1); // Default to "home" (index 1)
   const [contentIndex, setContentIndex] = useState({ row: -1, col: 0 }); // -1 = hero
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+
+  // Expand/collapse sidebar based on active zone
+  useEffect(() => {
+    setIsSidebarExpanded(activeZone === "sidebar");
+  }, [activeZone]);
 
   // Reset content focus when mode changes
   useEffect(() => {
@@ -66,6 +73,7 @@ export const FocusProvider = ({ children, mode, hasSidebar }: FocusProviderProps
     headerIndex,
     sidebarIndex,
     contentIndex,
+    isSidebarExpanded,
     setActiveZone,
     setHeaderIndex,
     setSidebarIndex,

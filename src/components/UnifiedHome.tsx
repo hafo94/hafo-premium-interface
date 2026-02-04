@@ -5,12 +5,79 @@ import ModeSidebar from "./ModeSidebar";
 import MoviesContent from "./content/MoviesContent";
 import TVContent from "./content/TVContent";
 import GamesContent from "./content/GamesContent";
-import { FocusProvider } from "@/contexts/FocusContext";
+import { FocusProvider, useFocus } from "@/contexts/FocusContext";
 
 const modeAccentColors: Record<AppMode, string> = {
   movies: "--nipflix",
   tv: "--tv",
   games: "--retro",
+};
+
+// Inner component that can access focus context
+const UnifiedHomeContent = ({ 
+  mode, 
+  activeNavItem, 
+  hasSidebar,
+  accentColor,
+  onModeChange,
+  onNavItemSelect
+}: {
+  mode: AppMode;
+  activeNavItem: string;
+  hasSidebar: boolean;
+  accentColor: string;
+  onModeChange: (mode: AppMode) => void;
+  onNavItemSelect: (itemId: string) => void;
+}) => {
+  const { isSidebarExpanded } = useFocus();
+  
+  // Content padding based on sidebar expansion state
+  const contentPadding = hasSidebar 
+    ? (isSidebarExpanded ? "pl-52" : "pl-16") 
+    : "";
+
+  return (
+    <div className="min-h-screen w-full relative overflow-hidden">
+      {/* Animated Background */}
+      <AnimatedBackground accentColor={accentColor} />
+
+      {/* Header */}
+      <ModeHeader activeMode={mode} onModeChange={onModeChange} />
+
+      {/* Sidebar */}
+      {hasSidebar && (
+        <ModeSidebar
+          mode={mode}
+          activeItem={activeNavItem}
+          onItemSelect={onNavItemSelect}
+        />
+      )}
+
+      {/* Main Content Area */}
+      <main
+        className={`relative z-10 transition-all duration-300 ${contentPadding}`}
+      >
+        {mode === "movies" && (
+          <MoviesContent activeSection={activeNavItem} />
+        )}
+        {mode === "tv" && (
+          <TVContent activeSection={activeNavItem} />
+        )}
+        {mode === "games" && <GamesContent />}
+      </main>
+
+      {/* Footer */}
+      <footer
+        className={`relative z-10 px-6 py-4 transition-all duration-300 ${contentPadding}`}
+      >
+        <div className="flex items-center justify-between text-xs text-foreground/30">
+          <span className="font-normal tracking-wider">hafo media hub</span>
+          <div className="h-px w-24 bg-gradient-to-r from-transparent via-border to-transparent" />
+          <span className="font-normal">v1.0</span>
+        </div>
+      </footer>
+    </div>
+  );
 };
 
 const UnifiedHome = () => {
@@ -34,51 +101,16 @@ const UnifiedHome = () => {
   // Determine if sidebar should be visible
   const hasSidebar = mode !== "games";
 
-  // Content padding based on sidebar visibility
-  const contentPadding = hasSidebar ? "pl-52" : "";
-
   return (
     <FocusProvider mode={mode} hasSidebar={hasSidebar}>
-      <div className="min-h-screen w-full relative overflow-hidden">
-        {/* Animated Background */}
-        <AnimatedBackground accentColor={accentColor} />
-
-        {/* Header */}
-        <ModeHeader activeMode={mode} onModeChange={handleModeChange} />
-
-        {/* Sidebar */}
-        {hasSidebar && (
-          <ModeSidebar
-            mode={mode}
-            activeItem={activeNavItem}
-            onItemSelect={handleNavItemSelect}
-          />
-        )}
-
-        {/* Main Content Area */}
-        <main
-          className={`relative z-10 transition-all duration-300 ${contentPadding}`}
-        >
-          {mode === "movies" && (
-            <MoviesContent activeSection={activeNavItem} />
-          )}
-          {mode === "tv" && (
-            <TVContent activeSection={activeNavItem} />
-          )}
-          {mode === "games" && <GamesContent />}
-        </main>
-
-        {/* Footer */}
-        <footer
-          className={`relative z-10 px-6 py-4 transition-all duration-300 ${contentPadding}`}
-        >
-          <div className="flex items-center justify-between text-xs text-foreground/30">
-            <span className="font-normal tracking-wider">hafo media hub</span>
-            <div className="h-px w-24 bg-gradient-to-r from-transparent via-border to-transparent" />
-            <span className="font-normal">v1.0</span>
-          </div>
-        </footer>
-      </div>
+      <UnifiedHomeContent
+        mode={mode}
+        activeNavItem={activeNavItem}
+        hasSidebar={hasSidebar}
+        accentColor={accentColor}
+        onModeChange={handleModeChange}
+        onNavItemSelect={handleNavItemSelect}
+      />
     </FocusProvider>
   );
 };
