@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { tvChannels, TVChannel, TVProgram, categoryLabels, getCategoryCount } from "@/data/tvChannels";
 import { useTVHomeChannels } from "@/hooks/useTVHomeChannels";
 import ChannelCard from "@/components/tv/ChannelCard";
@@ -8,6 +8,7 @@ import EPGGrid from "@/components/tv/EPGGrid";
 import TVHomeSettings from "@/components/tv/TVHomeSettings";
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useFocus } from "@/contexts/FocusContext";
 
 interface TVContentProps {
   activeSection: string;
@@ -19,13 +20,21 @@ const TVContent = ({ activeSection }: TVContentProps) => {
   const [showChannelList, setShowChannelList] = useState(false);
   const [showEPG, setShowEPG] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  const { activeZone, contentIndex, setContentIndex, focusSidebar, setActiveZone } = useFocus();
+  const isContentFocused = activeZone === "content";
 
   const homeChannelsList = tvChannels.filter((c) => homeChannels.includes(c.id));
-  // Sort by the order in homeChannels array
   const sortedHomeChannels = homeChannels
     .map(id => tvChannels.find(c => c.id === id))
     .filter(Boolean) as TVChannel[];
+
+  // Show all channels when activeSection is 'all-channels'
+  const showAllChannels = activeSection === "all-channels";
+
+  // Calculate visible channels
+  const visibleChannels = showAllChannels ? tvChannels : sortedHomeChannels;
+  const columnsPerRow = showAllChannels ? 6 : visibleChannels.length; // Single row for home
 
   const handleChannelSelect = useCallback((channel: TVChannel) => {
     setSelectedChannel(channel);
@@ -42,6 +51,109 @@ const TVContent = ({ activeSection }: TVContentProps) => {
       handleChannelSelect(channel);
     }
   }, [handleChannelSelect]);
+
+  // Keyboard navigation for content area
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!isContentFocused || selectedChannel) return;
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      // Skip alt key combos
+      if (e.altKey) return;
+
+      const { row, col } = contentIndex;
+      const totalChannels = visibleChannels.length;
+
+      if (showAllChannels) {
+        // Grid navigation for all channels
+        const currentIndex = row * columnsPerRow + col;
+
+        switch (e.key) {
+          case "ArrowLeft":
+            e.preventDefault();
+            if (col === 0) {
+              focusSidebar();
+            } else {
+              setContentIndex({ row, col: col - 1 });
+            }
+            break;
+          case "ArrowRight":
+            e.preventDefault();
+            const nextCol = col + 1;
+            const nextIndex = row * columnsPerRow + nextCol;
+            if (nextCol < columnsPerRow && nextIndex < totalChannels) {
+              setContentIndex({ row, col: nextCol });
+            }
+            break;
+          case "ArrowUp":
+            e.preventDefault();
+            if (row === 0) {
+              focusSidebar();
+            } else {
+              const prevRowIndex = (row - 1) * columnsPerRow + col;
+              if (prevRowIndex >= 0) {
+                setContentIndex({ row: row - 1, col });
+              }
+            }
+            break;
+          case "ArrowDown":
+            e.preventDefault();
+            const nextRowIndex = (row + 1) * columnsPerRow + col;
+            if (nextRowIndex < totalChannels) {
+              setContentIndex({ row: row + 1, col: Math.min(col, (totalChannels - 1) % columnsPerRow) });
+            }
+            break;
+          case "Enter":
+            e.preventDefault();
+            if (currentIndex < totalChannels) {
+              handleChannelSelect(visibleChannels[currentIndex]);
+            }
+            break;
+        }
+      } else {
+        // Horizontal navigation for home channels
+        const currentIndex = col;
+
+        switch (e.key) {
+          case "ArrowLeft":
+            e.preventDefault();
+            if (col === 0) {
+              focusSidebar();
+            } else {
+              setContentIndex({ row: 0, col: col - 1 });
+            }
+            break;
+          case "ArrowRight":
+            e.preventDefault();
+            if (col < totalChannels - 1) {
+              setContentIndex({ row: 0, col: col + 1 });
+            }
+            break;
+          case "ArrowUp":
+            e.preventDefault();
+            focusSidebar();
+            break;
+          case "Enter":
+            e.preventDefault();
+            if (currentIndex < totalChannels) {
+              handleChannelSelect(visibleChannels[currentIndex]);
+            }
+            break;
+        }
+      }
+    },
+    [isContentFocused, selectedChannel, contentIndex, visibleChannels, showAllChannels, columnsPerRow, focusSidebar, setContentIndex, handleChannelSelect]
+  );
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleKeyDown]);
 
   // If watching a channel, show the player
   if (selectedChannel) {
@@ -70,15 +182,15 @@ const TVContent = ({ activeSection }: TVContentProps) => {
     );
   }
 
-  // Show all channels when activeSection is 'all-channels'
-  const showAllChannels = activeSection === "all-channels";
-
-  // Icon size classes
-  const sizeClasses = {
-    small: "w-20 h-14",
-    medium: "w-28 h-20",
-    large: "w-36 h-24"
+  // Calculate focused index based on layout
+  const getFocusedIndex = () => {
+    if (showAllChannels) {
+      return contentIndex.row * columnsPerRow + contentIndex.col;
+    }
+    return contentIndex.col;
   };
+
+  const focusedIndex = getFocusedIndex();
 
   return (
     <div className="min-h-screen px-6 py-8">
@@ -120,8 +232,17 @@ const TVContent = ({ activeSection }: TVContentProps) => {
                   key={channel.id}
                   channel={channel}
                   isFavorite={true}
-                  isSelected={index === selectedIndex}
-                  onClick={() => handleChannelSelect(channel)}
+                  isSelected={isContentFocused && focusedIndex === index}
+                  onClick={() => {
+                    setActiveZone("content");
+                    setContentIndex({ row: 0, col: index });
+                    handleChannelSelect(channel);
+                  }}
+                  onMouseEnter={() => {
+                    if (isContentFocused) {
+                      setContentIndex({ row: 0, col: index });
+                    }
+                  }}
                   size={iconSize}
                 />
               ))
@@ -152,18 +273,41 @@ const TVContent = ({ activeSection }: TVContentProps) => {
 
           {/* Channel Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-            {tvChannels.map((channel) => (
-              <ChannelCard
-                key={channel.id}
-                channel={channel}
-                isFavorite={isOnHome(channel.id)}
-                onClick={() => handleChannelSelect(channel)}
-                size="small"
-              />
-            ))}
+            {tvChannels.map((channel, index) => {
+              const row = Math.floor(index / columnsPerRow);
+              const col = index % columnsPerRow;
+              const isFocused = isContentFocused && contentIndex.row === row && contentIndex.col === col;
+              
+              return (
+                <ChannelCard
+                  key={channel.id}
+                  channel={channel}
+                  isFavorite={isOnHome(channel.id)}
+                  isSelected={isFocused}
+                  onClick={() => {
+                    setActiveZone("content");
+                    setContentIndex({ row, col });
+                    handleChannelSelect(channel);
+                  }}
+                  onMouseEnter={() => {
+                    if (isContentFocused) {
+                      setContentIndex({ row, col });
+                    }
+                  }}
+                  size="small"
+                />
+              );
+            })}
           </div>
         </section>
       )}
+
+      {/* Keyboard hint */}
+      <div className="mt-4 text-center">
+        <p className="text-xs text-muted-foreground/50">
+          ← Sidebar • ↑↓←→ Navigate • Enter Select
+        </p>
+      </div>
 
       {/* Channel List Overlay */}
       <ChannelListOverlay

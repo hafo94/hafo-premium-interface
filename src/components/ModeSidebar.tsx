@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { AppMode } from "./ModeHeader";
+import { useFocus } from "@/contexts/FocusContext";
 
 interface SidebarItem {
   id: string;
@@ -50,7 +51,16 @@ interface ModeSidebarProps {
 const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
   const items = sidebarConfig[mode];
   const color = modeColors[mode];
-  const [focusedIndex, setFocusedIndex] = useState(0);
+  const { 
+    activeZone, 
+    sidebarIndex, 
+    setSidebarIndex, 
+    focusHeader, 
+    focusContent,
+    setActiveZone 
+  } = useFocus();
+
+  const isSidebarFocused = activeZone === "sidebar";
 
   // If no items, don't render
   if (items.length === 0) {
@@ -59,8 +69,8 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Only handle if sidebar has items
-      if (items.length === 0) return;
+      // Only handle if sidebar is focused
+      if (!isSidebarFocused) return;
 
       // Don't handle if in input
       if (
@@ -72,28 +82,32 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
 
       switch (e.key) {
         case "ArrowUp":
-          if (!e.altKey) {
-            e.preventDefault();
-            setFocusedIndex((prev) =>
-              prev > 0 ? prev - 1 : items.length - 1
-            );
+          e.preventDefault();
+          if (sidebarIndex === 0) {
+            // At top, go to header
+            focusHeader();
+          } else {
+            setSidebarIndex(sidebarIndex - 1);
           }
           break;
         case "ArrowDown":
-          if (!e.altKey) {
-            e.preventDefault();
-            setFocusedIndex((prev) =>
-              prev < items.length - 1 ? prev + 1 : 0
-            );
+          e.preventDefault();
+          if (sidebarIndex < items.length - 1) {
+            setSidebarIndex(sidebarIndex + 1);
           }
+          break;
+        case "ArrowRight":
+          e.preventDefault();
+          // Move to content area
+          focusContent();
           break;
         case "Enter":
           e.preventDefault();
-          onItemSelect(items[focusedIndex].id);
+          onItemSelect(items[sidebarIndex].id);
           break;
       }
     },
-    [items, focusedIndex, onItemSelect]
+    [items, sidebarIndex, onItemSelect, isSidebarFocused, focusHeader, focusContent, setSidebarIndex]
   );
 
   useEffect(() => {
@@ -103,16 +117,16 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
 
   // Reset focused index when mode changes
   useEffect(() => {
-    setFocusedIndex(0);
-  }, [mode]);
+    setSidebarIndex(1); // Default to "home"
+  }, [mode, setSidebarIndex]);
 
-  // Sync focusedIndex with activeItem
+  // Sync sidebarIndex with activeItem
   useEffect(() => {
     const idx = items.findIndex((item) => item.id === activeItem);
     if (idx !== -1) {
-      setFocusedIndex(idx);
+      setSidebarIndex(idx);
     }
-  }, [activeItem, items]);
+  }, [activeItem, items, setSidebarIndex]);
 
   return (
     <aside
@@ -128,14 +142,22 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
       <nav className="flex flex-col gap-1 mt-4">
         {items.map((item, index) => {
           const isActive = activeItem === item.id;
-          const isFocused = focusedIndex === index;
+          const isFocused = isSidebarFocused && sidebarIndex === index;
           const Icon = item.icon;
 
           return (
             <button
               key={item.id}
-              onClick={() => onItemSelect(item.id)}
-              onMouseEnter={() => setFocusedIndex(index)}
+              onClick={() => {
+                setActiveZone("sidebar");
+                setSidebarIndex(index);
+                onItemSelect(item.id);
+              }}
+              onMouseEnter={() => {
+                if (isSidebarFocused) {
+                  setSidebarIndex(index);
+                }
+              }}
               className={cn(
                 "relative flex items-center gap-3 px-4 py-3 rounded-xl",
                 "text-sm font-medium transition-all duration-200",
@@ -174,7 +196,7 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
 
               {/* Focus ring */}
               {isFocused && !isActive && (
-                <div className="absolute inset-0 rounded-xl ring-1 ring-foreground/10" />
+                <div className="absolute inset-0 rounded-xl ring-2 ring-foreground/20" />
               )}
             </button>
           );
@@ -184,7 +206,7 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
       {/* Keyboard hint */}
       <div className="mt-auto pt-4 border-t border-border/20">
         <p className="text-xs text-muted-foreground/50 text-center">
-          ↑↓ Navigate • Enter Select
+          ↑↓ Navigate • → Content • Enter Select
         </p>
       </div>
     </aside>

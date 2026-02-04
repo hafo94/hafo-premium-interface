@@ -1,10 +1,12 @@
 import { TVChannel } from '@/data/tvChannels';
+import { cn } from '@/lib/utils';
 
 interface ChannelCardProps {
   channel: TVChannel;
   isFavorite?: boolean;
   isSelected?: boolean;
   onClick: () => void;
+  onMouseEnter?: () => void;
   size?: 'small' | 'medium' | 'large';
 }
 
@@ -13,6 +15,7 @@ const ChannelCard = ({
   isFavorite = false,
   isSelected = false,
   onClick,
+  onMouseEnter,
   size = 'medium'
 }: ChannelCardProps) => {
   const sizeClasses = {
@@ -32,18 +35,18 @@ const ChannelCard = ({
   return (
     <button
       onClick={onClick}
-      className={`
-        ${sizeClasses[size]}
-        relative group flex flex-col items-center justify-center gap-2
-        rounded-xl p-3
-        bg-gradient-to-br from-white/5 to-white/[0.02]
-        backdrop-blur-md border border-white/10
-        transition-all duration-300 ease-out
-        hover:scale-105 hover:border-white/20
-        hover:shadow-[0_0_30px_rgba(139,92,246,0.3)]
-        focus:outline-none focus:ring-2 focus:ring-primary/50
-        ${isSelected ? 'ring-2 ring-primary border-primary/50 shadow-[0_0_30px_rgba(139,92,246,0.4)]' : ''}
-      `}
+      onMouseEnter={onMouseEnter}
+      className={cn(
+        sizeClasses[size],
+        "relative group flex flex-col items-center justify-center gap-2",
+        "rounded-xl p-3",
+        "bg-gradient-to-br from-white/5 to-white/[0.02]",
+        "backdrop-blur-md border transition-all duration-300 ease-out",
+        "focus:outline-none",
+        isSelected
+          ? "border-tv/60 scale-110 shadow-[0_0_40px_hsl(var(--tv)/0.5)] ring-2 ring-tv/50 z-10"
+          : "border-white/10 hover:scale-105 hover:border-white/20 hover:shadow-[0_0_30px_rgba(139,92,246,0.3)]"
+      )}
     >
       {/* Live Indicator */}
       <div className="absolute top-2 right-2 flex items-center gap-1">
@@ -55,12 +58,11 @@ const ChannelCard = ({
       </div>
 
       {/* Channel Logo */}
-      <div className={`
-        w-12 h-12 rounded-full flex items-center justify-center
-        bg-gradient-to-br ${logoColors[channel.category]}
-        text-white font-bold text-sm
-        shadow-lg
-      `}>
+      <div className={cn(
+        "w-12 h-12 rounded-full flex items-center justify-center",
+        "bg-gradient-to-br text-white font-bold text-sm shadow-lg",
+        logoColors[channel.category]
+      )}>
         {channel.shortName.slice(0, 3)}
       </div>
 
@@ -74,8 +76,13 @@ const ChannelCard = ({
         {channel.currentProgram.title}
       </span>
 
-      {/* Hover Glow Effect */}
-      <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-primary/10 to-purple-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+      {/* Focus/Hover Glow Effect */}
+      <div className={cn(
+        "absolute inset-0 rounded-xl transition-opacity duration-300 pointer-events-none",
+        isSelected
+          ? "bg-gradient-to-br from-tv/20 to-tv/10 opacity-100"
+          : "bg-gradient-to-br from-primary/10 to-purple-600/10 opacity-0 group-hover:opacity-100"
+      )} />
     </button>
   );
 };

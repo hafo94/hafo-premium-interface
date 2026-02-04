@@ -5,6 +5,7 @@ import FeaturedHero from "@/components/watch/FeaturedHero";
 import SearchOverlay from "@/components/watch/SearchOverlay";
 import { watchContent, contentCategories, WatchContent } from "@/data/watchContent";
 import { useMyList } from "@/hooks/useMyList";
+import { useFocus } from "@/contexts/FocusContext";
 
 interface MoviesContentProps {
   activeSection: string;
@@ -12,6 +13,8 @@ interface MoviesContentProps {
 
 const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   const { myList, toggleInList, isInList } = useMyList();
+  const { activeZone, contentIndex, setContentIndex, focusSidebar, setActiveZone } = useFocus();
+  const isContentFocused = activeZone === "content";
 
   // Featured content - rotate through hot/recommended items
   const featuredItems = watchContent.filter(
@@ -19,10 +22,6 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   );
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featuredContent = featuredItems[featuredIndex] || featuredItems[0];
-
-  // Navigation state
-  const [focusedRow, setFocusedRow] = useState(-1);
-  const [focusedItems, setFocusedItems] = useState<number[]>([]);
 
   // Detail view
   const [selectedContent, setSelectedContent] = useState<WatchContent | null>(
@@ -65,11 +64,6 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     return allCategories;
   }, [myList]);
 
-  // Initialize focused items when categories change
-  useEffect(() => {
-    setFocusedItems(visibleCategories.map(() => 0));
-  }, [visibleCategories.length]);
-
   // Auto-rotate featured content
   useEffect(() => {
     const interval = setInterval(() => {
@@ -80,9 +74,12 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
 
   // Handle keyboard navigation
   useEffect(() => {
-    if (selectedContent || isSearchOpen) return;
+    if (selectedContent || isSearchOpen || !isContentFocused) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Skip alt key combos (used by header)
+      if (e.altKey) return;
+
       // Open search with 's' key
       if (e.key === "s" || e.key === "S") {
         e.preventDefault();
@@ -90,55 +87,66 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
         return;
       }
 
-      // If hero is active, let FeaturedHero handle left/right/enter
+      const { row, col } = contentIndex;
+
+      // If hero is active (row === -1), let FeaturedHero handle left/right/enter
       if (
-        focusedRow === -1 &&
+        row === -1 &&
         (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter")
       ) {
         return;
       }
 
-      // Skip alt key combos (used by header)
-      if (e.altKey) return;
-
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setFocusedRow((prev) =>
-            Math.min(prev + 1, visibleCategories.length - 1)
-          );
+          if (row < visibleCategories.length - 1) {
+            setContentIndex({ row: row + 1, col: 0 });
+          }
           break;
         case "ArrowUp":
           e.preventDefault();
-          setFocusedRow((prev) => prev - 1);
+          if (row === -1) {
+            // From hero, go to sidebar
+            focusSidebar();
+          } else if (row === 0) {
+            // From first row, go to hero
+            setContentIndex({ row: -1, col: 0 });
+          } else {
+            setContentIndex({ row: row - 1, col });
+          }
           break;
         case "ArrowRight":
           e.preventDefault();
-          setFocusedItems((prev) => {
-            const newItems = [...prev];
-            const maxIndex =
-              visibleCategories[focusedRow]?.items.length - 1 || 0;
-            newItems[focusedRow] = Math.min(
-              (newItems[focusedRow] || 0) + 1,
-              maxIndex
-            );
-            return newItems;
-          });
+          if (row >= 0) {
+            const maxIndex = visibleCategories[row]?.items.length - 1 || 0;
+            if (col < maxIndex) {
+              setContentIndex({ row, col: col + 1 });
+            }
+          }
           break;
         case "ArrowLeft":
           e.preventDefault();
-          setFocusedItems((prev) => {
-            const newItems = [...prev];
-            newItems[focusedRow] = Math.max((newItems[focusedRow] || 0) - 1, 0);
-            return newItems;
-          });
+          if (row >= 0) {
+            if (col === 0) {
+              // At first item, go to sidebar
+              focusSidebar();
+            } else {
+              setContentIndex({ row, col: col - 1 });
+            }
+          } else {
+            // In hero, go to sidebar
+            focusSidebar();
+          }
           break;
         case "Enter":
           e.preventDefault();
-          const category = visibleCategories[focusedRow];
-          const item = category?.items[focusedItems[focusedRow] || 0];
-          if (item) {
-            setSelectedContent(item);
+          if (row >= 0) {
+            const category = visibleCategories[row];
+            const item = category?.items[col];
+            if (item) {
+              setSelectedContent(item);
+            }
           }
           break;
       }
@@ -146,18 +154,14 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedContent, isSearchOpen, focusedRow, focusedItems, visibleCategories]);
+  }, [selectedContent, isSearchOpen, isContentFocused, contentIndex, visibleCategories, focusSidebar, setContentIndex]);
 
   const handleItemFocusChange = useCallback(
     (rowIndex: number, itemIndex: number) => {
-      setFocusedRow(rowIndex);
-      setFocusedItems((prev) => {
-        const newItems = [...prev];
-        newItems[rowIndex] = itemIndex;
-        return newItems;
-      });
+      setActiveZone("content");
+      setContentIndex({ row: rowIndex, col: itemIndex });
     },
-    []
+    [setActiveZone, setContentIndex]
   );
 
   return (
@@ -165,7 +169,7 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
       {/* Featured Hero */}
       <FeaturedHero
         content={featuredContent}
-        isActive={focusedRow === -1}
+        isActive={isContentFocused && contentIndex.row === -1}
         isInList={isInList(featuredContent.id)}
         onSelect={setSelectedContent}
         onInfo={setSelectedContent}
@@ -195,14 +199,21 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
             title={category.title}
             items={category.items}
             rowIndex={rowIndex}
-            isActiveRow={focusedRow === rowIndex}
-            focusedItemIndex={focusedItems[rowIndex] || 0}
+            isActiveRow={isContentFocused && contentIndex.row === rowIndex}
+            focusedItemIndex={contentIndex.row === rowIndex ? contentIndex.col : 0}
             onItemSelect={setSelectedContent}
             onFocusChange={(itemIndex) =>
               handleItemFocusChange(rowIndex, itemIndex)
             }
           />
         ))}
+      </div>
+
+      {/* Keyboard hint */}
+      <div className="mt-4 text-center pb-4">
+        <p className="text-xs text-muted-foreground/50">
+          ← Sidebar • ↑↓←→ Navigate • Enter Select • S Search
+        </p>
       </div>
 
       {/* Search Overlay */}
