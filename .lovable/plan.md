@@ -1,157 +1,120 @@
 
+# Fix Search Results Image Flickering
 
-# Faster Search with Popularity Sorting
+## Problem
 
-## Problems Identified
+When typing in search, the movie/actor images flicker (disappear and reappear quickly). This creates a jarring visual experience.
 
-1. **Slow Search Experience**
-   - 300ms debounce delay before search starts
-   - No feedback while typing (waiting for debounce)
-   - Edge function cold start adds latency on first search
+## Root Cause Analysis
 
-2. **Poor Result Ordering**
-   - TMDB's `/search/multi` endpoint returns results by text relevance, not popularity
-   - Obscure "Batman" titles appear before "The Dark Knight" or "Batman Begins"
-   - The `popularity` field exists in the data but isn't being used to sort
+1. **React Query clears data on new queries** - When the search term changes, the previous results become `undefined` while new results load, causing images to unmount and remount
+
+2. **No loading placeholder for images** - Images render without a background placeholder, so they flash from empty to loaded
+
+3. **No smooth transition** - There's no fade-in animation when images load
 
 ## Solution
 
-### 1. Reduce Debounce Time (Speed)
+### 1. Keep Previous Data While Loading (React Query)
 
-Change debounce from 300ms to 150ms for faster response:
-
-**File: `src/components/watch/SearchOverlay.tsx`**
-
-```typescript
-// Before
-const timer = setTimeout(() => {
-  setDebouncedTerm(searchTerm);
-}, 300);
-
-// After  
-const timer = setTimeout(() => {
-  setDebouncedTerm(searchTerm);
-}, 150);
-```
-
-### 2. Sort Results by Popularity (Better Ordering)
-
-Sort search results client-side after receiving from TMDB. Since `TMDBSearchResult` includes a `popularity` field, we sort highest first.
-
-**File: `src/hooks/useTMDB.ts`**
-
-Update `useTMDBSearch` to sort results:
-
-```typescript
-export const useTMDBSearch = (query: string, page = 1) => {
-  return useQuery({
-    queryKey: ["tmdb", "search", query, page],
-    queryFn: async () => {
-      if (!query.trim()) return [];
-      const response = await tmdbService.searchContent(query, page);
-      return response.results
-        .map(transformTMDBSearchResult)
-        .filter((item): item is WatchContent => item !== null)
-        .sort((a, b) => {
-          // Sort by a combination of rating and popularity
-          // Higher vote count items with good ratings should appear first
-          const scoreA = (a.rating || 0) * (a.isRecommended ? 2 : 1);
-          const scoreB = (b.rating || 0) * (b.isRecommended ? 2 : 1);
-          return scoreB - scoreA;
-        });
-    },
-    enabled: query.trim().length > 0,
-    staleTime: STALE_TIME,
-  });
-};
-```
-
-**Better approach**: Access raw popularity before transformation:
-
-```typescript
-export const useTMDBSearch = (query: string, page = 1) => {
-  return useQuery({
-    queryKey: ["tmdb", "search", query, page],
-    queryFn: async () => {
-      if (!query.trim()) return [];
-      const response = await tmdbService.searchContent(query, page);
-      
-      // Sort by popularity BEFORE transforming
-      const sortedResults = [...response.results].sort(
-        (a, b) => b.popularity - a.popularity
-      );
-      
-      return sortedResults
-        .map(transformTMDBSearchResult)
-        .filter((item): item is WatchContent => item !== null);
-    },
-    enabled: query.trim().length > 0,
-    staleTime: STALE_TIME,
-  });
-};
-```
-
-### 3. Sort Person Search Results Too
-
-Apply the same popularity sorting to person search:
+Add `placeholderData` option to preserve the previous search results while new ones are loading:
 
 **File: `src/hooks/useTMDB.ts`**
 
 ```typescript
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+
+export const useTMDBSearch = (query: string, page = 1) => {
+  return useQuery({
+    queryKey: ["tmdb", "search", query, page],
+    queryFn: async () => { /* ... */ },
+    enabled: query.trim().length > 0,
+    staleTime: STALE_TIME,
+    placeholderData: keepPreviousData, // ADD THIS
+  });
+};
+
 export const useTMDBPersonSearch = (query: string, page = 1) => {
   return useQuery({
     queryKey: ["tmdb", "search-person", query, page],
-    queryFn: async (): Promise<TMDBPerson[]> => {
-      if (!query.trim()) return [];
-      const response = await tmdbService.searchPerson(query, page);
-      // Sort by popularity - most famous actors/actresses first
-      return [...response.results].sort((a, b) => b.popularity - a.popularity);
-    },
+    queryFn: async () => { /* ... */ },
     enabled: query.trim().length > 0,
     staleTime: STALE_TIME,
+    placeholderData: keepPreviousData, // ADD THIS
   });
 };
 ```
 
-### 4. Immediate Visual Feedback (Perceived Speed)
+This keeps the old results visible while new ones are fetching, eliminating the flash to empty state.
 
-Show loading state immediately when typing starts, not just after debounce:
+### 2. Add Image Loading Placeholder & Fade-In
+
+Add a background color to image containers and a fade-in animation when images load:
 
 **File: `src/components/watch/SearchOverlay.tsx`**
 
-```typescript
-// Track if we're waiting for debounce
-const isWaitingForDebounce = searchTerm !== debouncedTerm && searchTerm.trim().length > 0;
-
-// Update loading indicator logic
-const isSearching = isWaitingForDebounce || isSearchingContent || isSearchingPerson || isLoadingCredits;
+For content results:
+```tsx
+<button
+  key={item.id}
+  className={cn(
+    'relative aspect-video rounded-lg overflow-hidden',
+    'bg-muted/50', // ADD: Background placeholder
+    // ... rest of classes
+  )}
+>
+  <img
+    src={item.backdrop || item.poster}
+    alt={item.title}
+    className="w-full h-full object-cover transition-opacity duration-300"
+    loading="lazy"
+    onLoad={(e) => {
+      (e.target as HTMLImageElement).style.opacity = '1';
+    }}
+    style={{ opacity: 0 }} // Start invisible, fade in on load
+    onError={(e) => {
+      (e.target as HTMLImageElement).src = '/placeholder.svg';
+      (e.target as HTMLImageElement).style.opacity = '1';
+    }}
+  />
 ```
 
-This gives users immediate feedback that their input is being processed.
+For person results - similar treatment for profile images.
+
+### 3. Use Stable Keys
+
+The current `key={item.id}` is already good, but we should ensure the same item doesn't remount by verifying IDs are stable TMDB IDs (which they are).
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/watch/SearchOverlay.tsx` | Reduce debounce to 150ms, add immediate loading state |
-| `src/hooks/useTMDB.ts` | Sort content results by popularity, sort person results by popularity |
+| `src/hooks/useTMDB.ts` | Add `placeholderData: keepPreviousData` to `useTMDBSearch` and `useTMDBPersonSearch` |
+| `src/components/watch/SearchOverlay.tsx` | Add background placeholder, lazy loading, and fade-in transition to images |
+
+## Technical Details
+
+**`keepPreviousData` behavior:**
+- When query changes (e.g., "bat" → "batm"), the previous results stay visible
+- New results smoothly replace old ones once fetched
+- No empty/loading flash between results
+
+**Image fade-in technique:**
+- Image starts with `opacity: 0`
+- `onLoad` sets `opacity: 1`
+- CSS `transition-opacity` creates smooth fade
+- Background placeholder shows while loading
 
 ## Expected Results
 
-**Before (searching "Batman"):**
-1. Batman: The Killing Joke (2016)
-2. Batman vs Dracula (2005)
-3. Batman Ninja (2018)
-4. The Dark Knight (2008) ← Finally appears!
+**Before:**
+- Type "b" → results appear
+- Type "a" → results disappear, loading, reappear
+- Type "t" → results disappear, loading, reappear
+- Images flash and flicker on each keystroke
 
-**After (searching "Batman"):**
-1. The Dark Knight (2008) ← Most popular first
-2. The Dark Knight Rises (2012)
-3. Batman Begins (2005)
-4. Batman (1989)
-5. Batman Returns (1992)
-
-**Speed improvement:**
-- 150ms debounce instead of 300ms = 50% faster initial response
-- Immediate loading spinner = feels even faster
-
+**After:**
+- Type "b" → results appear
+- Type "a" → previous results stay visible, smoothly transition to new results
+- Type "t" → same smooth transition
+- Images fade in gracefully, no flicker
