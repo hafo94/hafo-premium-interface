@@ -90,12 +90,8 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
           onModeChange(modes[newIndex].id);
         } else if (e.key === "ArrowDown") {
           e.preventDefault();
-          // Move to sidebar or content
-          focusSidebar();
-          if (activeZone === "header") {
-            // If no sidebar (games mode), go to content
-            focusContent();
-          }
+          // Move directly to content
+          focusContent();
         } else if (e.key === "Enter") {
           e.preventDefault();
           onModeChange(modes[headerIndex].id);

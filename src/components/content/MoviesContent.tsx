@@ -13,7 +13,7 @@ interface MoviesContentProps {
 
 const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   const { myList, toggleInList, isInList } = useMyList();
-  const { activeZone, contentIndex, setContentIndex, focusSidebar, setActiveZone } = useFocus();
+  const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
 
   // Featured content - rotate through hot/recommended items
@@ -107,8 +107,8 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
         case "ArrowUp":
           e.preventDefault();
           if (row === -1) {
-            // From hero, go to sidebar
-            focusSidebar();
+            // From hero, go directly to header
+            focusHeader();
           } else if (row === 0) {
             // From first row, go to hero
             setContentIndex({ row: -1, col: 0 });
