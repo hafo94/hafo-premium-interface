@@ -21,7 +21,7 @@ const TVContent = ({ activeSection }: TVContentProps) => {
   const [showEPG, setShowEPG] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  const { activeZone, contentIndex, setContentIndex, focusSidebar, setActiveZone } = useFocus();
+  const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
 
   const homeChannelsList = tvChannels.filter((c) => homeChannels.includes(c.id));
@@ -93,7 +93,7 @@ const TVContent = ({ activeSection }: TVContentProps) => {
           case "ArrowUp":
             e.preventDefault();
             if (row === 0) {
-              focusSidebar();
+              focusHeader();
             } else {
               const prevRowIndex = (row - 1) * columnsPerRow + col;
               if (prevRowIndex >= 0) {
@@ -136,7 +136,7 @@ const TVContent = ({ activeSection }: TVContentProps) => {
             break;
           case "ArrowUp":
             e.preventDefault();
-            focusSidebar();
+            focusHeader();
             break;
           case "Enter":
             e.preventDefault();
