@@ -1,113 +1,157 @@
 
-# Fix Auto-Scroll When New Movies Load
 
-## Problem
+# Faster Search with Popularity Sorting
 
-When new movies are loaded via infinite scroll, the page automatically scrolls the user downward. This happens because the `useEffect` in `ContentGrid.tsx` that scrolls the focused item into view fires whenever the component re-renders, not just when the user explicitly changes focus.
+## Problems Identified
 
-## Root Cause
+1. **Slow Search Experience**
+   - 300ms debounce delay before search starts
+   - No feedback while typing (waiting for debounce)
+   - Edge function cold start adds latency on first search
 
-In `ContentGrid.tsx`, this effect triggers scroll on every render where the grid is active:
-
-```tsx
-useEffect(() => {
-  if (!isActive || focusedIndex < 0) return;
-  // ... scrolls to focused item
-}, [focusedIndex, isActive]);
-```
-
-When infinite scroll adds new items, the grid re-renders and this effect fires, scrolling to the focused item even though the user didn't navigate.
+2. **Poor Result Ordering**
+   - TMDB's `/search/multi` endpoint returns results by text relevance, not popularity
+   - Obscure "Batman" titles appear before "The Dark Knight" or "Batman Begins"
+   - The `popularity` field exists in the data but isn't being used to sort
 
 ## Solution
 
-Track whether the focus change was triggered by user interaction (keyboard/mouse) vs component re-render. Only scroll when focus was explicitly changed by the user.
+### 1. Reduce Debounce Time (Speed)
 
-**Approach**: Use a ref to track if the focus change was intentional
+Change debounce from 300ms to 150ms for faster response:
 
-## Implementation Details
+**File: `src/components/watch/SearchOverlay.tsx`**
 
-### File: `src/components/watch/ContentGrid.tsx`
+```typescript
+// Before
+const timer = setTimeout(() => {
+  setDebouncedTerm(searchTerm);
+}, 300);
 
-1. **Add a ref to track user-initiated focus changes**:
-   ```tsx
-   const userInitiatedFocus = useRef(false);
-   ```
-
-2. **Update the scroll effect to check the ref**:
-   ```tsx
-   useEffect(() => {
-     if (!isActive || focusedIndex < 0) return;
-     if (!userInitiatedFocus.current) return; // Skip if not user-initiated
-     
-     userInitiatedFocus.current = false; // Reset after scrolling
-     
-     const grid = gridRef.current;
-     if (!grid) return;
-
-     const focusedElement = grid.children[focusedIndex] as HTMLElement;
-     if (focusedElement) {
-       focusedElement.scrollIntoView({
-         behavior: "smooth",
-         block: "center",
-       });
-     }
-   }, [focusedIndex, isActive]);
-   ```
-
-3. **Set the ref when user interacts**:
-   - In `handleMouseEnter`: Set `userInitiatedFocus.current = true` before calling `onFocusChange`
-   - In `handleItemClick`: Set `userInitiatedFocus.current = true` before calling `onFocusChange`
-
-4. **Parent keyboard navigation needs similar flag**:
-   - Update `MoviesContent.tsx` and `SeriesContent.tsx` grid keyboard navigation to pass a signal that focus was user-initiated
-   - Alternatively, modify `onFocusChange` to accept a second parameter indicating user intent
-
-### Alternative (Simpler) Approach
-
-Instead of prop drilling, track the previous `focusedIndex` and only scroll when it actually changes:
-
-```tsx
-const prevFocusIndex = useRef(focusedIndex);
-
-useEffect(() => {
-  if (!isActive || focusedIndex < 0) return;
-  
-  // Only scroll if focusedIndex actually changed
-  if (prevFocusIndex.current === focusedIndex) return;
-  prevFocusIndex.current = focusedIndex;
-  
-  const grid = gridRef.current;
-  if (!grid) return;
-
-  const focusedElement = grid.children[focusedIndex] as HTMLElement;
-  if (focusedElement) {
-    focusedElement.scrollIntoView({
-      behavior: "smooth",
-      block: "center",
-    });
-  }
-}, [focusedIndex, isActive]);
+// After  
+const timer = setTimeout(() => {
+  setDebouncedTerm(searchTerm);
+}, 150);
 ```
 
-This simpler approach works because:
-- When the user navigates, `focusedIndex` changes → scrolls
-- When infinite scroll loads more items, `focusedIndex` stays the same → no scroll
+### 2. Sort Results by Popularity (Better Ordering)
+
+Sort search results client-side after receiving from TMDB. Since `TMDBSearchResult` includes a `popularity` field, we sort highest first.
+
+**File: `src/hooks/useTMDB.ts`**
+
+Update `useTMDBSearch` to sort results:
+
+```typescript
+export const useTMDBSearch = (query: string, page = 1) => {
+  return useQuery({
+    queryKey: ["tmdb", "search", query, page],
+    queryFn: async () => {
+      if (!query.trim()) return [];
+      const response = await tmdbService.searchContent(query, page);
+      return response.results
+        .map(transformTMDBSearchResult)
+        .filter((item): item is WatchContent => item !== null)
+        .sort((a, b) => {
+          // Sort by a combination of rating and popularity
+          // Higher vote count items with good ratings should appear first
+          const scoreA = (a.rating || 0) * (a.isRecommended ? 2 : 1);
+          const scoreB = (b.rating || 0) * (b.isRecommended ? 2 : 1);
+          return scoreB - scoreA;
+        });
+    },
+    enabled: query.trim().length > 0,
+    staleTime: STALE_TIME,
+  });
+};
+```
+
+**Better approach**: Access raw popularity before transformation:
+
+```typescript
+export const useTMDBSearch = (query: string, page = 1) => {
+  return useQuery({
+    queryKey: ["tmdb", "search", query, page],
+    queryFn: async () => {
+      if (!query.trim()) return [];
+      const response = await tmdbService.searchContent(query, page);
+      
+      // Sort by popularity BEFORE transforming
+      const sortedResults = [...response.results].sort(
+        (a, b) => b.popularity - a.popularity
+      );
+      
+      return sortedResults
+        .map(transformTMDBSearchResult)
+        .filter((item): item is WatchContent => item !== null);
+    },
+    enabled: query.trim().length > 0,
+    staleTime: STALE_TIME,
+  });
+};
+```
+
+### 3. Sort Person Search Results Too
+
+Apply the same popularity sorting to person search:
+
+**File: `src/hooks/useTMDB.ts`**
+
+```typescript
+export const useTMDBPersonSearch = (query: string, page = 1) => {
+  return useQuery({
+    queryKey: ["tmdb", "search-person", query, page],
+    queryFn: async (): Promise<TMDBPerson[]> => {
+      if (!query.trim()) return [];
+      const response = await tmdbService.searchPerson(query, page);
+      // Sort by popularity - most famous actors/actresses first
+      return [...response.results].sort((a, b) => b.popularity - a.popularity);
+    },
+    enabled: query.trim().length > 0,
+    staleTime: STALE_TIME,
+  });
+};
+```
+
+### 4. Immediate Visual Feedback (Perceived Speed)
+
+Show loading state immediately when typing starts, not just after debounce:
+
+**File: `src/components/watch/SearchOverlay.tsx`**
+
+```typescript
+// Track if we're waiting for debounce
+const isWaitingForDebounce = searchTerm !== debouncedTerm && searchTerm.trim().length > 0;
+
+// Update loading indicator logic
+const isSearching = isWaitingForDebounce || isSearchingContent || isSearchingPerson || isLoadingCredits;
+```
+
+This gives users immediate feedback that their input is being processed.
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/components/watch/ContentGrid.tsx` | Add `prevFocusIndex` ref, update scroll effect to only fire when focus actually changes |
+| `src/components/watch/SearchOverlay.tsx` | Reduce debounce to 150ms, add immediate loading state |
+| `src/hooks/useTMDB.ts` | Sort content results by popularity, sort person results by popularity |
 
-## Visual Result
+## Expected Results
 
-**Before:**
-- Scroll to bottom of page
-- New movies load (infinite scroll)
-- Page jerks back to wherever the focused item is
+**Before (searching "Batman"):**
+1. Batman: The Killing Joke (2016)
+2. Batman vs Dracula (2005)
+3. Batman Ninja (2018)
+4. The Dark Knight (2008) ← Finally appears!
 
-**After:**
-- Scroll to bottom of page
-- New movies load smoothly
-- Page stays exactly where you are
-- Only scrolls when you press arrow keys to navigate
+**After (searching "Batman"):**
+1. The Dark Knight (2008) ← Most popular first
+2. The Dark Knight Rises (2012)
+3. Batman Begins (2005)
+4. Batman (1989)
+5. Batman Returns (1992)
+
+**Speed improvement:**
+- 150ms debounce instead of 300ms = 50% faster initial response
+- Immediate loading spinner = feels even faster
+
