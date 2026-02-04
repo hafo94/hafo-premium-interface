@@ -59,7 +59,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-8 pb-8 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center py-8 overflow-y-auto">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-background/80 backdrop-blur-sm"
@@ -103,9 +103,11 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
                     style={{ width: `${content.progress}%` }}
                   />
                 </div>
-                <span className="text-sm text-muted-foreground">
-                  {Math.round((content.progress / 100) * content.runtime)}m of {formatRuntime(content.runtime)}
-                </span>
+                {content.runtime && content.runtime > 0 && (
+                  <span className="text-sm text-muted-foreground">
+                    {Math.round((content.progress / 100) * content.runtime)}m of {formatRuntime(content.runtime)}
+                  </span>
+                )}
               </div>
             )}
 
@@ -160,7 +162,9 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
             <div className="flex-1">
               <div className="flex items-center gap-3 text-sm mb-4">
                 <span className="text-foreground">{content.year}</span>
-                <span className="text-muted-foreground">{formatRuntime(content.runtime)}</span>
+                {content.runtime && content.runtime > 0 && (
+                  <span className="text-muted-foreground">{formatRuntime(content.runtime)}</span>
+                )}
                 <span className="px-1.5 py-0.5 border border-muted-foreground/50 text-xs rounded">HD</span>
                 {isInList && (
                   <span className="flex items-center gap-1 text-nipflix text-xs font-medium">
