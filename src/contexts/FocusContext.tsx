@@ -90,10 +90,28 @@ export const FocusProvider = ({ children, mode, hasSidebar }: FocusProviderProps
   );
 };
 
+// Default context value for when hook is used outside provider
+const defaultFocusValue: FocusContextValue = {
+  activeZone: "content",
+  headerIndex: 0,
+  sidebarIndex: 1,
+  contentIndex: { row: -1, col: 0 },
+  isSidebarExpanded: false,
+  setActiveZone: () => {},
+  setHeaderIndex: () => {},
+  setSidebarIndex: () => {},
+  setContentIndex: () => {},
+  focusHeader: () => {},
+  focusSidebar: () => {},
+  focusContent: () => {},
+};
+
 export const useFocus = () => {
   const context = useContext(FocusContext);
+  // Return default value instead of throwing if outside provider
+  // This handles edge cases like HMR or initial render
   if (!context) {
-    throw new Error("useFocus must be used within a FocusProvider");
+    return defaultFocusValue;
   }
   return context;
 };
