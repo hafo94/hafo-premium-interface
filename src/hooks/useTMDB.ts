@@ -128,28 +128,48 @@ export const useSeriesDetails = (id: number | undefined) => {
   });
 };
 
-export const useTMDBSearch = (query: string, page = 1) => {
+export const useTMDBSearch = (
+  query: string, 
+  page = 1,
+  mediaFilter: 'movie' | 'tv' | 'all' = 'all'
+) => {
   return useQuery({
-    queryKey: ["tmdb", "search", query, page],
+    queryKey: ["tmdb", "search", query, page, mediaFilter],
     queryFn: async () => {
       if (!query.trim()) return [];
       
-      // Fetch multi-search and TV-specific search in parallel
-      // TV search ensures popular shows like "The White Lotus" appear for "White"
-      const [multiResponse, tvResponse] = await Promise.all([
-        tmdbService.searchContent(query, page),
-        tmdbService.searchTV(query, page),
-      ]);
+      // Optimize: only fetch relevant data based on filter
+      let multiResults: any[] = [];
+      let tvResults: any[] = [];
       
-      // Transform TV results with media_type added
-      const tvResults = tvResponse.results.map(tv => ({
-        ...tv,
-        media_type: 'tv' as const,
-        popularity: tv.popularity,
-      }));
+      if (mediaFilter === 'movie') {
+        // Only search movies via multi-search and filter
+        const response = await tmdbService.searchContent(query, page);
+        multiResults = response.results.filter(r => r.media_type === 'movie');
+      } else if (mediaFilter === 'tv') {
+        // Only search TV
+        const response = await tmdbService.searchTV(query, page);
+        tvResults = response.results.map(tv => ({
+          ...tv,
+          media_type: 'tv' as const,
+          popularity: tv.popularity,
+        }));
+      } else {
+        // Search all (existing behavior)
+        const [multiResponse, tvResponse] = await Promise.all([
+          tmdbService.searchContent(query, page),
+          tmdbService.searchTV(query, page),
+        ]);
+        multiResults = multiResponse.results;
+        tvResults = tvResponse.results.map(tv => ({
+          ...tv,
+          media_type: 'tv' as const,
+          popularity: tv.popularity,
+        }));
+      }
       
       // Merge and deduplicate by ID+type
-      const allResults = [...multiResponse.results, ...tvResults];
+      const allResults = [...multiResults, ...tvResults];
       const seen = new Set<string>();
       const uniqueResults = allResults.filter(item => {
         const mediaType = item.media_type || ('title' in item ? 'movie' : 'tv');

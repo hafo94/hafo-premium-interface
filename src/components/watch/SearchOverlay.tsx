@@ -10,6 +10,7 @@ interface SearchOverlayProps {
   isOpen: boolean;
   onClose: () => void;
   onSelect: (content: WatchContent) => void;
+  mediaFilter?: 'movie' | 'tv' | 'all';
 }
 
 const KEYBOARD_ROWS = [
@@ -22,7 +23,7 @@ const KEYBOARD_ROWS = [
 type FocusArea = 'searchType' | 'keyboard' | 'results' | 'close' | 'back';
 type SearchType = 'content' | 'person';
 
-const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
+const SearchOverlay = ({ isOpen, onClose, onSelect, mediaFilter = 'all' }: SearchOverlayProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm, setDebouncedTerm] = useState('');
   const [searchType, setSearchType] = useState<SearchType>('content');
@@ -44,9 +45,11 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
   // Track if we're waiting for debounce (immediate visual feedback)
   const isWaitingForDebounce = searchTerm !== debouncedTerm && searchTerm.trim().length > 0;
 
-  // Use TMDB search hooks
+  // Use TMDB search hooks with media filter
   const { data: tmdbResults, isLoading: isSearchingContent } = useTMDBSearch(
-    searchType === 'content' ? debouncedTerm : ''
+    searchType === 'content' ? debouncedTerm : '',
+    1,
+    mediaFilter
   );
   const { data: personResults, isLoading: isSearchingPerson } = useTMDBPersonSearch(
     searchType === 'person' && !selectedPerson ? debouncedTerm : ''
@@ -359,7 +362,13 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
               <div className="text-2xl font-light text-foreground tracking-wide min-h-[40px] border-b-2 border-nipflix pb-1">
                 {searchTerm || (
                   <span className="text-muted-foreground text-lg">
-                    {searchType === 'content' ? 'Search titles, genres...' : 'Search actors, actresses...'}
+                    {searchType === 'content' 
+                      ? mediaFilter === 'movie' 
+                        ? 'Search movies...' 
+                        : mediaFilter === 'tv' 
+                        ? 'Search series...' 
+                        : 'Search titles, genres...'
+                      : 'Search actors, actresses...'}
                   </span>
                 )}
                 <span className="inline-block w-0.5 h-6 bg-nipflix animate-pulse ml-1 align-middle" />

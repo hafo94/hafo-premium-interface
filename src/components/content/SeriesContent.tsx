@@ -456,6 +456,7 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onSelect={setSelectedContent}
+        mediaFilter="tv"
       />
 
       {/* Detail Modal */}
