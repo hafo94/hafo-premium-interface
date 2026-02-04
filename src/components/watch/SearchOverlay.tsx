@@ -285,7 +285,7 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-background animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-40 bg-background animate-in fade-in duration-200 pt-16">
       <div className="h-full flex flex-col p-8 ml-52">
         {/* Search Type Toggle */}
         <div className="flex items-center gap-4 mb-6">
