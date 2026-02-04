@@ -16,9 +16,9 @@ export interface WatchContent {
   id: string;
   title: string;
   type: 'movie' | 'series';
-  year: number;
-  rating: number;
-  runtime: number;
+  year?: number;
+  rating?: number;
+  runtime?: number;
   genre: string[];
   plot: string;
   poster: string;
@@ -27,6 +27,11 @@ export interface WatchContent {
   isHot?: boolean;
   isRecommended?: boolean;
   progress?: number; // 0-100 percentage
+  // TMDB-specific fields
+  tmdbId?: number;
+  cast?: string[];
+  director?: string;
+  episodes?: number;
 }
 
 export const genres = [
