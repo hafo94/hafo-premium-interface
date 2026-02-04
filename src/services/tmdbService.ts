@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+// TMDB Service - calls the secure edge function proxy
 
 export interface TMDBMovie {
   id: number;
@@ -81,15 +81,6 @@ export interface TMDBSearchResult {
 const callTMDB = async <T>(endpoint: string, params: Record<string, string> = {}): Promise<T> => {
   const searchParams = new URLSearchParams({ endpoint, ...params });
   
-  const { data, error } = await supabase.functions.invoke('tmdb', {
-    body: null,
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  // Use fetch directly since supabase.functions.invoke doesn't support query params well
   const projectUrl = import.meta.env.VITE_SUPABASE_URL;
   const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
   
