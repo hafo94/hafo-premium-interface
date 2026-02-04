@@ -33,6 +33,10 @@ export interface WatchContent {
   director?: string;
   episodes?: number;
   similarContent?: WatchContent[];
+  // IPTV-specific fields
+  iptvId?: number;           // Xtream stream_id
+  streamUrl?: string;        // Direct stream URL
+  containerExtension?: string; // mkv, mp4, etc.
 }
 
 export const genres = [

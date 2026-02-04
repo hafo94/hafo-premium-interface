@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, Play, Plus, Check, ThumbsUp, ChevronDown, ChevronUp, Volume2 } from 'lucide-react';
+import { X, Play, Plus, Check, ThumbsUp, ChevronDown, ChevronUp, Volume2, Loader2 } from 'lucide-react';
 import { WatchContent, Season, Episode } from '@/data/watchContent';
 import { cn } from '@/lib/utils';
 import { useMovieDetails, useSeriesDetails } from '@/hooks/useTMDB';
+import { useIPTVContext } from '@/contexts/IPTVContext';
+import { playOnKodi } from '@/services/kodiService';
+import { useToast } from '@/hooks/use-toast';
 
 interface ContentDetailProps {
   content: WatchContent;
@@ -16,7 +19,10 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
     content.seasons?.[0]?.id || null
   );
   const [focusedButton, setFocusedButton] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   const contentScrollRef = React.useRef<HTMLDivElement>(null);
+  const { kodiConfig, kodiConnected } = useIPTVContext();
+  const { toast } = useToast();
 
   // Fetch full details including similar content
   const { data: movieDetails } = useMovieDetails(
@@ -30,6 +36,52 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   const enrichedContent = movieDetails || seriesDetails || content;
 
   const buttons = ['play', 'add', 'like', 'mute'];
+
+  const handlePlay = async () => {
+    if (!content.streamUrl) {
+      toast({
+        title: "No stream available",
+        description: "This content doesn't have a stream URL configured.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!kodiConfig || !kodiConnected) {
+      toast({
+        title: "Kodi not connected",
+        description: "Please configure Kodi in Settings → Kodi tab.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsPlaying(true);
+    try {
+      const result = await playOnKodi(kodiConfig, content.streamUrl);
+      if (result.success) {
+        toast({
+          title: "Playing on Kodi",
+          description: `Now playing: ${content.title}`,
+        });
+      } else {
+        toast({
+          title: "Playback failed",
+          description: result.error || "Could not start playback on Kodi",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Playback failed",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPlaying(false);
+    }
+  };
+
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -58,7 +110,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
         case 'Enter':
           e.preventDefault();
           if (buttons[focusedButton] === 'play') {
-            // Play action
+            handlePlay();
           } else if (buttons[focusedButton] === 'add') {
             onToggleList(content.id);
           }
@@ -135,12 +187,18 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
             {/* Action buttons */}
             <div className="flex items-center gap-3">
               <button
+                onClick={handlePlay}
+                disabled={isPlaying}
                 className={cn(
-                  'flex items-center gap-2 px-6 py-2 bg-foreground text-background font-semibold rounded transition-all',
+                  'flex items-center gap-2 px-6 py-2 bg-foreground text-background font-semibold rounded transition-all disabled:opacity-50',
                   focusedButton === 0 && 'ring-4 ring-foreground/50'
                 )}
               >
-                <Play className="w-5 h-5 fill-current" />
+                {isPlaying ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Play className="w-5 h-5 fill-current" />
+                )}
                 {content.progress ? 'Resume' : 'Play'}
               </button>
               <button
