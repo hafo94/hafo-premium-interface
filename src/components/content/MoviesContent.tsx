@@ -3,10 +3,12 @@ import ContentRow from "@/components/watch/ContentRow";
 import ContentDetail from "@/components/watch/ContentDetail";
 import FeaturedHero from "@/components/watch/FeaturedHero";
 import SearchOverlay from "@/components/watch/SearchOverlay";
+import ContentGrid, { useGridColumns2 } from "@/components/watch/ContentGrid";
 import { WatchContent } from "@/data/watchContent";
 import { useMyList } from "@/hooks/useMyList";
 import { useFocus } from "@/contexts/FocusContext";
-import { useMoviesPageData, useMoviesByGenre, usePopularMovies, useNowPlayingMovies } from "@/hooks/useTMDB";
+import { useMoviesPageData } from "@/hooks/useTMDB";
+import { useInfinitePopularMovies, useInfiniteNowPlayingMovies, useInfiniteMoviesByGenre } from "@/hooks/useInfiniteContent";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMovieGenreLabel } from "@/data/genreConfig";
 
@@ -18,30 +20,79 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   const { myList, toggleInList, isInList } = useMyList();
   const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
+  const gridColumns = useGridColumns2();
 
-  // Determine if a genre is selected
+  // Determine if viewing grid mode
   const isGenreSelected = activeSection.startsWith("genre-");
   const selectedGenreId = isGenreSelected ? activeSection.replace("genre-", "") : undefined;
+  const isGridView = activeSection === "popular" || activeSection === "cinema" || isGenreSelected;
 
   // Fetch TMDB data for home view
-  const { popularMovies, trendingMovies, topRatedMovies, nowPlaying, isLoading: homeLoading, error: homeError } = useMoviesPageData();
-  
-  // Fetch popular movies for "popular" section
-  const { data: popularData, isLoading: popularLoading, error: popularError } = usePopularMovies(1);
-  
-  // Fetch now playing for "cinema" section  
-  const { data: cinemaData, isLoading: cinemaLoading, error: cinemaError } = useNowPlayingMovies(1);
+  const { trendingMovies, isLoading: homeLoading, error: homeError, popularMovies, topRatedMovies, nowPlaying } = useMoviesPageData();
 
-  // Fetch genre-specific data
-  const { data: genreMovies, isLoading: genreLoading, error: genreError } = useMoviesByGenre(selectedGenreId);
+  // Infinite queries for grid views
+  const { 
+    data: popularData, 
+    fetchNextPage: fetchNextPopular, 
+    hasNextPage: hasMorePopular, 
+    isFetchingNextPage: fetchingPopular,
+    isLoading: popularLoading 
+  } = useInfinitePopularMovies();
+
+  const { 
+    data: cinemaData, 
+    fetchNextPage: fetchNextCinema, 
+    hasNextPage: hasMoreCinema, 
+    isFetchingNextPage: fetchingCinema,
+    isLoading: cinemaLoading 
+  } = useInfiniteNowPlayingMovies();
+
+  const { 
+    data: genreData, 
+    fetchNextPage: fetchNextGenre, 
+    hasNextPage: hasMoreGenre, 
+    isFetchingNextPage: fetchingGenre,
+    isLoading: genreLoading 
+  } = useInfiniteMoviesByGenre(selectedGenreId);
+
+  // Flatten infinite query pages
+  const gridItems = useMemo(() => {
+    if (activeSection === "popular" && popularData) {
+      return popularData.pages.flatMap((page) => page.items);
+    }
+    if (activeSection === "cinema" && cinemaData) {
+      return cinemaData.pages.flatMap((page) => page.items);
+    }
+    if (isGenreSelected && genreData) {
+      return genreData.pages.flatMap((page) => page.items);
+    }
+    return [];
+  }, [activeSection, popularData, cinemaData, genreData, isGenreSelected]);
+
+  // Grid view props
+  const gridProps = useMemo(() => {
+    if (activeSection === "popular") {
+      return { hasNextPage: hasMorePopular, isFetchingNextPage: fetchingPopular, onLoadMore: fetchNextPopular };
+    }
+    if (activeSection === "cinema") {
+      return { hasNextPage: hasMoreCinema, isFetchingNextPage: fetchingCinema, onLoadMore: fetchNextCinema };
+    }
+    if (isGenreSelected) {
+      return { hasNextPage: hasMoreGenre, isFetchingNextPage: fetchingGenre, onLoadMore: fetchNextGenre };
+    }
+    return { hasNextPage: false, isFetchingNextPage: false, onLoadMore: () => {} };
+  }, [activeSection, isGenreSelected, hasMorePopular, hasMoreCinema, hasMoreGenre, fetchingPopular, fetchingCinema, fetchingGenre, fetchNextPopular, fetchNextCinema, fetchNextGenre]);
+
+  // Grid focus index (flat index for 2D navigation)
+  const [gridFocusIndex, setGridFocusIndex] = useState(0);
 
   // Featured content - use trending movies for hero
   const featuredItems = useMemo(() => {
-    if (isGenreSelected && genreMovies) {
-      return genreMovies.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
+    if (isGridView && gridItems.length > 0) {
+      return gridItems.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
     }
     return trendingMovies.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
-  }, [trendingMovies, genreMovies, isGenreSelected]);
+  }, [trendingMovies, gridItems, isGridView]);
 
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featuredContent = featuredItems[featuredIndex] || featuredItems[0];
@@ -59,72 +110,30 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     }
   }, [activeSection]);
 
-  // Reset featured index when section changes
+  // Reset focus when section changes
   useEffect(() => {
     setFeaturedIndex(0);
-  }, [activeSection]);
+    setGridFocusIndex(0);
+    setContentIndex({ row: -1, col: 0 });
+  }, [activeSection, setContentIndex]);
 
-  // Build categories based on active section
+  // Build categories for home view
   const visibleCategories = useMemo(() => {
+    if (isGridView) return []; // Don't use categories in grid view
+
     const allMovies = [...popularMovies, ...trendingMovies, ...topRatedMovies, ...nowPlaying];
     const myListItems = allMovies.filter((item) => myList.includes(item.id));
 
-    // Genre view
-    if (isGenreSelected && genreMovies) {
-      const genreLabel = getMovieGenreLabel(selectedGenreId || "");
-      return [
-        ...(myListItems.length > 0
-          ? [{ id: "my-list", title: "My List", items: myListItems }]
-          : []),
-        { id: "genre-results", title: `${genreLabel} Movies`, items: genreMovies },
-      ];
-    }
-
-    // Popular section
-    if (activeSection === "popular") {
-      return [
-        ...(myListItems.length > 0
-          ? [{ id: "my-list", title: "My List", items: myListItems }]
-          : []),
-        ...(popularData && popularData.length > 0
-          ? [{ id: "popular", title: "Popular Movies", items: popularData }]
-          : []),
-      ];
-    }
-
-    // On Cinema section
-    if (activeSection === "cinema") {
-      return [
-        ...(myListItems.length > 0
-          ? [{ id: "my-list", title: "My List", items: myListItems }]
-          : []),
-        ...(cinemaData && cinemaData.length > 0
-          ? [{ id: "now-playing", title: "Now Playing in Cinemas", items: cinemaData }]
-          : []),
-      ];
-    }
-
-    // Home view (default)
     const categories = [
-      ...(myListItems.length > 0
-        ? [{ id: "my-list", title: "My List", items: myListItems }]
-        : []),
-      ...(trendingMovies.length > 0
-        ? [{ id: "trending", title: "Trending Now", items: trendingMovies }]
-        : []),
-      ...(popularMovies.length > 0
-        ? [{ id: "popular", title: "Popular Movies", items: popularMovies }]
-        : []),
-      ...(topRatedMovies.length > 0
-        ? [{ id: "top-rated", title: "Top Rated", items: topRatedMovies }]
-        : []),
-      ...(nowPlaying.length > 0
-        ? [{ id: "now-playing", title: "Now Playing", items: nowPlaying }]
-        : []),
+      ...(myListItems.length > 0 ? [{ id: "my-list", title: "My List", items: myListItems }] : []),
+      ...(trendingMovies.length > 0 ? [{ id: "trending", title: "Trending Now", items: trendingMovies }] : []),
+      ...(popularMovies.length > 0 ? [{ id: "popular", title: "Popular Movies", items: popularMovies }] : []),
+      ...(topRatedMovies.length > 0 ? [{ id: "top-rated", title: "Top Rated", items: topRatedMovies }] : []),
+      ...(nowPlaying.length > 0 ? [{ id: "now-playing", title: "Now Playing", items: nowPlaying }] : []),
     ];
 
     return categories;
-  }, [myList, popularMovies, trendingMovies, topRatedMovies, nowPlaying, isGenreSelected, genreMovies, selectedGenreId, activeSection, popularData, cinemaData]);
+  }, [myList, popularMovies, trendingMovies, topRatedMovies, nowPlaying, isGridView]);
 
   // Auto-rotate featured content
   useEffect(() => {
@@ -135,9 +144,93 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     return () => clearInterval(interval);
   }, [featuredItems.length]);
 
-  // Handle keyboard navigation
+  // Grid keyboard navigation
   useEffect(() => {
-    if (selectedContent || isSearchOpen || !isContentFocused) return;
+    if (!isGridView || selectedContent || isSearchOpen || !isContentFocused) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.altKey) return;
+
+      if (e.key === "s" || e.key === "S") {
+        e.preventDefault();
+        setIsSearchOpen(true);
+        return;
+      }
+
+      const { row } = contentIndex;
+      const totalItems = gridItems.length;
+
+      // Handle hero focus (row === -1)
+      if (row === -1) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setContentIndex({ row: 0, col: 0 });
+          setGridFocusIndex(0);
+        } else if (e.key === "ArrowUp") {
+          e.preventDefault();
+          focusHeader();
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          focusSidebar();
+        }
+        return;
+      }
+
+      // Grid navigation (row >= 0 means we're in the grid)
+      switch (e.key) {
+        case "ArrowDown": {
+          e.preventDefault();
+          const newIndex = gridFocusIndex + gridColumns;
+          if (newIndex < totalItems) {
+            setGridFocusIndex(newIndex);
+          }
+          break;
+        }
+        case "ArrowUp": {
+          e.preventDefault();
+          const newIndex = gridFocusIndex - gridColumns;
+          if (newIndex >= 0) {
+            setGridFocusIndex(newIndex);
+          } else {
+            setContentIndex({ row: -1, col: 0 });
+          }
+          break;
+        }
+        case "ArrowRight": {
+          e.preventDefault();
+          if (gridFocusIndex < totalItems - 1) {
+            setGridFocusIndex(gridFocusIndex + 1);
+          }
+          break;
+        }
+        case "ArrowLeft": {
+          e.preventDefault();
+          const colPosition = gridFocusIndex % gridColumns;
+          if (colPosition === 0) {
+            focusSidebar();
+          } else {
+            setGridFocusIndex(gridFocusIndex - 1);
+          }
+          break;
+        }
+        case "Enter": {
+          e.preventDefault();
+          const item = gridItems[gridFocusIndex];
+          if (item) {
+            setSelectedContent(item);
+          }
+          break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isGridView, selectedContent, isSearchOpen, isContentFocused, contentIndex, gridFocusIndex, gridItems, gridColumns, focusSidebar, focusHeader, setContentIndex]);
+
+  // Row-based keyboard navigation (home view)
+  useEffect(() => {
+    if (isGridView || selectedContent || isSearchOpen || !isContentFocused) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.altKey) return;
@@ -207,7 +300,7 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedContent, isSearchOpen, isContentFocused, contentIndex, visibleCategories, focusSidebar, focusHeader, setContentIndex]);
+  }, [isGridView, selectedContent, isSearchOpen, isContentFocused, contentIndex, visibleCategories, focusSidebar, focusHeader, setContentIndex]);
 
   const handleItemFocusChange = useCallback(
     (rowIndex: number, itemIndex: number) => {
@@ -217,9 +310,30 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     [setActiveZone, setContentIndex]
   );
 
+  const handleGridFocusChange = useCallback(
+    (index: number) => {
+      setActiveZone("content");
+      setContentIndex({ row: 0, col: 0 });
+      setGridFocusIndex(index);
+    },
+    [setActiveZone, setContentIndex]
+  );
+
   // Determine loading state
-  const isLoading = homeLoading || (isGenreSelected && genreLoading) || (activeSection === "popular" && popularLoading) || (activeSection === "cinema" && cinemaLoading);
-  const error = homeError || genreError || popularError || cinemaError;
+  const isLoading = isGridView
+    ? (activeSection === "popular" && popularLoading) ||
+      (activeSection === "cinema" && cinemaLoading) ||
+      (isGenreSelected && genreLoading)
+    : homeLoading;
+  const error = homeError;
+
+  // Get section title
+  const sectionTitle = useMemo(() => {
+    if (activeSection === "popular") return "Popular Movies";
+    if (activeSection === "cinema") return "Now Playing in Cinemas";
+    if (isGenreSelected) return `${getMovieGenreLabel(selectedGenreId || "")} Movies`;
+    return "";
+  }, [activeSection, isGenreSelected, selectedGenreId]);
 
   // Loading skeleton
   if (isLoading) {
@@ -287,21 +401,40 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
         </div>
       )}
 
-      {/* Content Rows */}
-      <div className="py-4 relative z-10 px-6">
-        {visibleCategories.map((category, rowIndex) => (
-          <ContentRow
-            key={category.id}
-            title={category.title}
-            items={category.items}
-            rowIndex={rowIndex}
-            isActiveRow={isContentFocused && contentIndex.row === rowIndex}
-            focusedItemIndex={contentIndex.row === rowIndex ? contentIndex.col : 0}
+      {/* Grid View */}
+      {isGridView && (
+        <div className="py-4 relative z-10 px-6">
+          <h2 className="text-xl font-semibold mb-4">{sectionTitle}</h2>
+          <ContentGrid
+            items={gridItems}
+            focusedIndex={gridFocusIndex}
+            isActive={isContentFocused && contentIndex.row >= 0}
+            onFocusChange={handleGridFocusChange}
             onItemSelect={setSelectedContent}
-            onFocusChange={(itemIndex) => handleItemFocusChange(rowIndex, itemIndex)}
+            hasNextPage={gridProps.hasNextPage}
+            isFetchingNextPage={gridProps.isFetchingNextPage}
+            onLoadMore={gridProps.onLoadMore}
           />
-        ))}
-      </div>
+        </div>
+      )}
+
+      {/* Content Rows (Home view) */}
+      {!isGridView && (
+        <div className="py-4 relative z-10 px-6">
+          {visibleCategories.map((category, rowIndex) => (
+            <ContentRow
+              key={category.id}
+              title={category.title}
+              items={category.items}
+              rowIndex={rowIndex}
+              isActiveRow={isContentFocused && contentIndex.row === rowIndex}
+              focusedItemIndex={contentIndex.row === rowIndex ? contentIndex.col : 0}
+              onItemSelect={setSelectedContent}
+              onFocusChange={(itemIndex) => handleItemFocusChange(rowIndex, itemIndex)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Keyboard hint */}
       <div className="mt-4 text-center pb-4">

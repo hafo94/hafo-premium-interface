@@ -1,5 +1,4 @@
 
-
 # Grid View for Categories with Infinite Scroll
 
 ## Overview
@@ -113,4 +112,3 @@ const isGridView = activeSection === "popular"
 - **Category view** (Popular, On Cinema, genres): Full-screen grid of content, scroll down to load more
 - **Navigation**: Arrow keys work intuitively in both row and grid layouts
 - **Sidebar**: Clean appearance when collapsed - only main menu items with icons visible
-
