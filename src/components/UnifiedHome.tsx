@@ -3,12 +3,14 @@ import AnimatedBackground from "./AnimatedBackground";
 import ModeHeader, { AppMode } from "./ModeHeader";
 import ModeSidebar from "./ModeSidebar";
 import MoviesContent from "./content/MoviesContent";
+import SeriesContent from "./content/SeriesContent";
 import TVContent from "./content/TVContent";
 import GamesContent from "./content/GamesContent";
 import { FocusProvider, useFocus } from "@/contexts/FocusContext";
 
 const modeAccentColors: Record<AppMode, string> = {
   movies: "--nipflix",
+  series: "--nipflix",
   tv: "--tv",
   games: "--retro",
 };
@@ -59,6 +61,9 @@ const UnifiedHomeContent = ({
       >
         {mode === "movies" && (
           <MoviesContent activeSection={activeNavItem} />
+        )}
+        {mode === "series" && (
+          <SeriesContent activeSection={activeNavItem} />
         )}
         {mode === "tv" && (
           <TVContent activeSection={activeNavItem} />
