@@ -1,156 +1,198 @@
 
-# Add Series Page (Duplicate of Movies Page)
+
+# Connect to TMDB API for Real Movie/Series Data
 
 ## Overview
-Create a new "Series" page that mirrors the Movies page in layout and functionality, but only displays series content (TV shows with episodes/seasons). This involves:
-1. Adding a new "series" mode to the app
-2. Creating a SeriesContent component based on MoviesContent
-3. Updating the header navigation to include the new mode
-4. Filtering data to show only series content
+Integrate TMDB (The Movie Database) API to replace static mock data with real popular movies, trending series, and metadata. This requires a backend component to securely store the API key.
+
+## Prerequisites
+Before implementation, you'll need to:
+1. **Enable Lovable Cloud** - Required to create edge functions that securely call TMDB
+2. **Get a TMDB API Key** - Free at [themoviedb.org/settings/api](https://www.themoviedb.org/settings/api)
 
 ## Architecture
 
-The current mode structure uses `AppMode` type defined in ModeHeader:
-```typescript
-type AppMode = "movies" | "tv" | "games"
+```text
+┌─────────────────┐      ┌──────────────────────┐      ┌─────────────┐
+│  React App      │ ──── │  Edge Function       │ ──── │  TMDB API   │
+│  (Frontend)     │      │  (Secure API Key)    │      │             │
+└─────────────────┘      └──────────────────────┘      └─────────────┘
+      │                           │
+      │ fetch /api/tmdb/movies    │ Authorization: Bearer TOKEN
+      └───────────────────────────┘
 ```
 
-We need to add `"series"` as a fourth mode.
+## Implementation Plan
 
-## Changes Required
+### Phase 1: Backend Setup
 
-### 1. Update ModeHeader.tsx - Add Series Mode
-**File:** `src/components/ModeHeader.tsx`
+#### 1.1 Enable Lovable Cloud
+Required to create edge functions and store secrets.
 
-Update the `AppMode` type and modes array:
+#### 1.2 Create TMDB Edge Function
+**New File:** `supabase/functions/tmdb/index.ts`
+
 ```typescript
-export type AppMode = "movies" | "series" | "tv" | "games";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const modes = [
-  { id: "movies" as AppMode, label: "Movies", color: "nipflix" },
-  { id: "series" as AppMode, label: "Series", color: "nipflix" },  // NEW
-  { id: "tv" as AppMode, label: "TV", color: "tv" },
-  { id: "games" as AppMode, label: "Games", color: "retro" },
-];
+const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+
+serve(async (req) => {
+  const TMDB_API_KEY = Deno.env.get("TMDB_API_KEY");
+  
+  // Handle endpoints:
+  // - /popular-movies
+  // - /popular-series  
+  // - /trending
+  // - /movie/:id
+  // - /tv/:id
+  // - /search?query=...
+});
 ```
 
-### 2. Create SeriesContent.tsx
-**New File:** `src/components/content/SeriesContent.tsx`
+#### 1.3 Store API Key as Secret
+After enabling Cloud, add `TMDB_API_KEY` as a secret.
 
-Duplicate `MoviesContent.tsx` with modifications to filter only series:
-- Change featured items filter: `item.type === 'series' && (item.isHot || item.isRecommended)`
-- Create series-specific categories that only include series content
-- Rename component to `SeriesContent`
+### Phase 2: API Service Layer
 
-Key filter logic:
+#### 2.1 Create TMDB Service
+**New File:** `src/services/tmdbService.ts`
+
 ```typescript
-// Only series content
-const seriesContent = watchContent.filter(item => item.type === 'series');
+export interface TMDBMovie {
+  id: number;
+  title: string;
+  overview: string;
+  poster_path: string;
+  backdrop_path: string;
+  vote_average: number;
+  release_date: string;
+  genre_ids: number[];
+  // ...
+}
 
-// Featured items - only hot/recommended series
-const featuredItems = seriesContent.filter(
-  (item) => item.isHot || item.isRecommended
-);
-
-// Categories for series
-const seriesCategories = [
-  { id: 'continue', title: 'Continue Watching', filter: (items) => items.filter(i => i.progress > 0) },
-  { id: 'trending', title: 'Trending Series', filter: (items) => items.filter(i => i.isHot) },
-  { id: 'recommended', title: 'Recommended For You', filter: (items) => items.filter(i => i.isRecommended) },
-  { id: 'all-series', title: 'All Series', filter: (items) => items },
-  // Genre-specific categories...
-];
-```
-
-### 3. Update ModeSidebar.tsx - Add Series Sidebar Config
-**File:** `src/components/ModeSidebar.tsx`
-
-Add sidebar configuration for series mode (same as movies):
-```typescript
-const sidebarConfig: Record<AppMode, SidebarItem[]> = {
-  movies: [
-    { id: "search", icon: Search, label: "Search" },
-    { id: "home", icon: Home, label: "Home" },
-    { id: "trending", icon: TrendingUp, label: "Trending" },
-    { id: "movies", icon: Film, label: "Movies" },
-    { id: "series", icon: Tv, label: "Series" },
-    { id: "cinema", icon: Clapperboard, label: "On Cinema" },
-  ],
-  series: [  // NEW - same structure as movies
-    { id: "search", icon: Search, label: "Search" },
-    { id: "home", icon: Home, label: "Home" },
-    { id: "trending", icon: TrendingUp, label: "Trending" },
-    { id: "drama", icon: Film, label: "Drama" },
-    { id: "comedy", icon: Tv, label: "Comedy" },
-    { id: "scifi", icon: Clapperboard, label: "Sci-Fi" },
-  ],
-  tv: [...],
-  games: [],
-};
-
-const modeColors: Record<AppMode, string> = {
-  movies: "nipflix",
-  series: "nipflix",  // Same color as movies
-  tv: "tv",
-  games: "retro",
+export const tmdbService = {
+  getPopularMovies: async (page = 1) => {...},
+  getPopularSeries: async (page = 1) => {...},
+  getTrending: async (timeWindow = 'week') => {...},
+  getMovieDetails: async (id: number) => {...},
+  getSeriesDetails: async (id: number) => {...},
+  searchContent: async (query: string) => {...},
 };
 ```
 
-### 4. Update UnifiedHome.tsx - Render SeriesContent
-**File:** `src/components/UnifiedHome.tsx`
+#### 2.2 Create Data Transformer
+**New File:** `src/services/tmdbTransformer.ts`
 
-- Import SeriesContent
-- Add accent color for series mode
-- Render SeriesContent when mode is "series"
+Transform TMDB responses to match existing `WatchContent` interface:
 
 ```typescript
-import SeriesContent from "./content/SeriesContent";
-
-const modeAccentColors: Record<AppMode, string> = {
-  movies: "--nipflix",
-  series: "--nipflix",  // Same as movies
-  tv: "--tv",
-  games: "--retro",
-};
-
-// In render:
-{mode === "series" && (
-  <SeriesContent activeSection={activeNavItem} />
-)}
+export const transformTMDBMovie = (movie: TMDBMovie): WatchContent => ({
+  id: String(movie.id),
+  title: movie.title,
+  type: 'movie',
+  year: new Date(movie.release_date).getFullYear(),
+  rating: movie.vote_average,
+  runtime: 0, // Requires separate details call
+  genre: mapGenreIds(movie.genre_ids),
+  plot: movie.overview,
+  poster: `https://image.tmdb.org/t/p/w500${movie.poster_path}`,
+  backdrop: `https://image.tmdb.org/t/p/original${movie.backdrop_path}`,
+  isHot: movie.vote_average >= 8,
+  isRecommended: movie.popularity > 100,
+});
 ```
 
-### 5. Update FocusContext.tsx - Support Series Mode
-**File:** `src/contexts/FocusContext.tsx`
+### Phase 3: React Query Integration
 
-Update the AppMode import/type if needed, ensuring the focus provider works with the new mode.
+#### 3.1 Create TMDB Hooks
+**New File:** `src/hooks/useTMDB.ts`
 
-## File Changes Summary
+```typescript
+export const usePopularMovies = () => {
+  return useQuery({
+    queryKey: ['tmdb', 'popular-movies'],
+    queryFn: tmdbService.getPopularMovies,
+    staleTime: 1000 * 60 * 15, // 15 minutes
+  });
+};
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/components/ModeHeader.tsx` | Modify | Add "series" to AppMode type and modes array |
-| `src/components/content/SeriesContent.tsx` | Create | Duplicate of MoviesContent filtered for series |
-| `src/components/ModeSidebar.tsx` | Modify | Add series sidebar config and color |
-| `src/components/UnifiedHome.tsx` | Modify | Import and render SeriesContent |
-| `src/contexts/FocusContext.tsx` | Modify | Ensure AppMode type supports series (if imported there) |
+export const usePopularSeries = () => {...};
+export const useTrending = () => {...};
+export const useMovieDetails = (id: number) => {...};
+```
 
-## Visual Result
+### Phase 4: Update Content Components
 
-Header will show: **Movies** | **Series** | **TV** | **Games**
+#### 4.1 Update MoviesContent.tsx
+- Replace static `watchContent` import with `usePopularMovies` hook
+- Add loading skeletons
+- Handle error states
+- Maintain existing navigation/focus logic
 
-When "Series" is selected:
-- Same Netflix-style hero with featured series
-- Rows of series content only (no movies)
-- Categories like "Trending Series", "Drama Series", "Comedy Series"
-- Same keyboard navigation as Movies page
+#### 4.2 Update SeriesContent.tsx
+- Similar changes using `usePopularSeries` hook
 
-## Data Filtering
+#### 4.3 Update SearchOverlay.tsx
+- Connect to TMDB search endpoint
+- Show real-time search results
 
-From the existing `watchContent` data, these items are series:
-- Breaking Bad
-- Stranger Things  
-- The Office
-- Game of Thrones
-- The Mandalorian
+### Phase 5: Enhanced Features
 
-The SeriesContent will filter to only show these items, organized into relevant categories.
+#### 5.1 Additional TMDB Endpoints to Use
+| Endpoint | Use Case |
+|----------|----------|
+| `/movie/popular` | Popular movies list |
+| `/tv/popular` | Popular TV series |
+| `/trending/all/week` | Trending content |
+| `/movie/{id}` | Full movie details (runtime, cast) |
+| `/tv/{id}` | Full series details (seasons, episodes) |
+| `/search/multi` | Search movies & series |
+| `/movie/{id}/similar` | Recommendations |
+| `/genre/movie/list` | Genre mappings |
+
+#### 5.2 Caching Strategy
+- Cache popular/trending for 15 minutes
+- Cache individual details for 1 hour
+- Use React Query's built-in caching
+
+## File Summary
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `supabase/functions/tmdb/index.ts` | Create | Secure API proxy |
+| `src/services/tmdbService.ts` | Create | TMDB API client |
+| `src/services/tmdbTransformer.ts` | Create | Data transformation |
+| `src/hooks/useTMDB.ts` | Create | React Query hooks |
+| `src/components/content/MoviesContent.tsx` | Modify | Use real TMDB data |
+| `src/components/content/SeriesContent.tsx` | Modify | Use real TMDB data |
+| `src/components/watch/SearchOverlay.tsx` | Modify | Real search |
+| `src/data/watchContent.ts` | Keep | Fallback/offline data |
+
+## Technical Details
+
+### TMDB Image URLs
+- Posters: `https://image.tmdb.org/t/p/w500{poster_path}`
+- Backdrops: `https://image.tmdb.org/t/p/original{backdrop_path}`
+- Available sizes: w92, w154, w185, w342, w500, w780, original
+
+### Genre ID Mapping
+TMDB uses numeric genre IDs. We'll fetch and cache the genre list:
+- 28 = Action
+- 12 = Adventure  
+- 16 = Animation
+- 35 = Comedy
+- 80 = Crime
+- 18 = Drama
+- 27 = Horror
+- 878 = Science Fiction
+
+### Rate Limiting
+TMDB allows ~40 requests per 10 seconds. React Query caching will help stay within limits.
+
+## Next Steps After Implementation
+1. Enable Lovable Cloud when prompted
+2. Add your TMDB API key as a secret
+3. The edge function will be deployed automatically
+4. Content will load from TMDB on next refresh
+
