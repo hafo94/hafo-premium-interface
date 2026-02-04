@@ -98,9 +98,12 @@ serve(async (req) => {
         );
     }
 
-    const response = await fetch(tmdbUrl, {
+    // Use API key as query parameter (v3 method - more reliable)
+    const separator = tmdbUrl.includes('?') ? '&' : '?';
+    const urlWithKey = `${tmdbUrl}${separator}api_key=${TMDB_API_KEY}`;
+
+    const response = await fetch(urlWithKey, {
       headers: {
-        'Authorization': `Bearer ${TMDB_API_KEY}`,
         'Content-Type': 'application/json',
       },
     });
