@@ -456,6 +456,7 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onSelect={setSelectedContent}
+        mediaFilter="movie"
       />
 
       {/* Detail Modal */}
