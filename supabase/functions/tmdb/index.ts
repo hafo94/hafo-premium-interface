@@ -125,6 +125,15 @@ serve(async (req) => {
         }
         tmdbUrl = `${TMDB_BASE_URL}/search/person?query=${encodeURIComponent(query)}&page=${page}`;
         break;
+      case "search-tv":
+        if (!query) {
+          return new Response(
+            JSON.stringify({ error: "Search query required" }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        tmdbUrl = `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(query)}&page=${page}`;
+        break;
       case "person-credits":
         if (!id) {
           return new Response(
