@@ -103,12 +103,20 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
   // Search overlay
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  // Get setSearchMode from focus context
+  const { setSearchMode } = useFocus();
+
   // Open search when activeSection is 'search'
   useEffect(() => {
     if (activeSection === "search") {
       setIsSearchOpen(true);
     }
   }, [activeSection]);
+
+  // Sync search mode with FocusContext
+  useEffect(() => {
+    setSearchMode(isSearchOpen);
+  }, [isSearchOpen, setSearchMode]);
 
   // Reset focus when section changes
   useEffect(() => {

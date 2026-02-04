@@ -78,6 +78,21 @@ export interface TMDBSearchResult {
   popularity: number;
 }
 
+export interface TMDBPerson {
+  id: number;
+  name: string;
+  profile_path: string | null;
+  known_for_department: string;
+  known_for: TMDBSearchResult[];
+  popularity: number;
+}
+
+export interface TMDBPersonCredits {
+  id: number;
+  cast: Array<TMDBMovie & { media_type?: string } | TMDBSeries & { media_type?: string }>;
+  crew: Array<TMDBMovie & { media_type?: string } | TMDBSeries & { media_type?: string }>;
+}
+
 const callTMDB = async <T>(endpoint: string, params: Record<string, string> = {}): Promise<T> => {
   const searchParams = new URLSearchParams({ endpoint, ...params });
   
@@ -155,5 +170,13 @@ export const tmdbService = {
 
   discoverSeries: async (genreId: number, page = 1): Promise<TMDBResponse<TMDBSeries>> => {
     return callTMDB('discover-series', { genre_id: String(genreId), page: String(page) });
+  },
+
+  searchPerson: async (query: string, page = 1): Promise<TMDBResponse<TMDBPerson>> => {
+    return callTMDB('search-person', { query, page: String(page) });
+  },
+
+  getPersonCredits: async (id: number): Promise<TMDBPersonCredits> => {
+    return callTMDB('person-credits', { id: String(id) });
   },
 };
