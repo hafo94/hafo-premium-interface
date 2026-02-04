@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
+import { useFocus } from "@/contexts/FocusContext";
 
 export type AppMode = "movies" | "tv" | "games";
 
@@ -15,13 +16,13 @@ const modes = [
 ];
 
 const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
-  const [focusedIndex, setFocusedIndex] = useState(
-    modes.findIndex((m) => m.id === activeMode)
-  );
+  const { activeZone, headerIndex, setHeaderIndex, focusSidebar, focusContent, setActiveZone } = useFocus();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const navRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const isHeaderFocused = activeZone === "header";
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -43,6 +44,12 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
       });
     }
   }, [activeMode]);
+
+  // Sync header index with active mode
+  useEffect(() => {
+    const idx = modes.findIndex((m) => m.id === activeMode);
+    setHeaderIndex(idx);
+  }, [activeMode, setHeaderIndex]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString("en-US", {
@@ -69,29 +76,52 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
         return;
       }
 
-      if (e.key === "ArrowLeft" && e.altKey) {
-        e.preventDefault();
-        const newIndex = focusedIndex > 0 ? focusedIndex - 1 : modes.length - 1;
-        setFocusedIndex(newIndex);
-        onModeChange(modes[newIndex].id);
-      } else if (e.key === "ArrowRight" && e.altKey) {
-        e.preventDefault();
-        const newIndex = focusedIndex < modes.length - 1 ? focusedIndex + 1 : 0;
-        setFocusedIndex(newIndex);
-        onModeChange(modes[newIndex].id);
+      // When header is focused, Left/Right navigate tabs without Alt
+      if (isHeaderFocused) {
+        if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          const newIndex = headerIndex > 0 ? headerIndex - 1 : modes.length - 1;
+          setHeaderIndex(newIndex);
+          onModeChange(modes[newIndex].id);
+        } else if (e.key === "ArrowRight") {
+          e.preventDefault();
+          const newIndex = headerIndex < modes.length - 1 ? headerIndex + 1 : 0;
+          setHeaderIndex(newIndex);
+          onModeChange(modes[newIndex].id);
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          // Move to sidebar or content
+          focusSidebar();
+          if (activeZone === "header") {
+            // If no sidebar (games mode), go to content
+            focusContent();
+          }
+        } else if (e.key === "Enter") {
+          e.preventDefault();
+          onModeChange(modes[headerIndex].id);
+        }
+      } else {
+        // Alt + Left/Right from any zone for quick mode switching
+        if (e.key === "ArrowLeft" && e.altKey) {
+          e.preventDefault();
+          const newIndex = headerIndex > 0 ? headerIndex - 1 : modes.length - 1;
+          setHeaderIndex(newIndex);
+          onModeChange(modes[newIndex].id);
+        } else if (e.key === "ArrowRight" && e.altKey) {
+          e.preventDefault();
+          const newIndex = headerIndex < modes.length - 1 ? headerIndex + 1 : 0;
+          setHeaderIndex(newIndex);
+          onModeChange(modes[newIndex].id);
+        }
       }
     },
-    [focusedIndex, onModeChange]
+    [isHeaderFocused, headerIndex, onModeChange, setHeaderIndex, focusSidebar, focusContent, activeZone]
   );
 
   useEffect(() => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
-
-  useEffect(() => {
-    setFocusedIndex(modes.findIndex((m) => m.id === activeMode));
-  }, [activeMode]);
 
   const activeColor = modes.find((m) => m.id === activeMode)?.color || "nipflix";
 
@@ -109,27 +139,45 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
       >
         {modes.map((mode, index) => {
           const isActive = activeMode === mode.id;
+          const isFocused = isHeaderFocused && headerIndex === index;
 
           return (
             <button
               key={mode.id}
               ref={(el) => (buttonRefs.current[index] = el)}
-              onClick={() => onModeChange(mode.id)}
+              onClick={() => {
+                setActiveZone("header");
+                setHeaderIndex(index);
+                onModeChange(mode.id);
+              }}
               className={cn(
                 "relative py-2 text-sm font-light tracking-[0.2em] uppercase",
                 "transition-all duration-300 ease-out",
                 "focus:outline-none",
                 isActive
                   ? `text-${mode.color}`
-                  : "text-muted-foreground hover:text-foreground/80"
+                  : "text-muted-foreground hover:text-foreground/80",
+                isFocused && !isActive && "text-foreground"
               )}
               style={{
                 textShadow: isActive
                   ? `0 0 20px hsl(var(--${mode.color}) / 0.5)`
+                  : isFocused
+                  ? `0 0 10px hsl(var(--foreground) / 0.3)`
                   : "none",
               }}
             >
               {mode.label}
+              
+              {/* Focus indicator ring for header focus */}
+              {isFocused && (
+                <span 
+                  className="absolute -inset-x-3 -inset-y-1 rounded-lg ring-2 ring-foreground/30"
+                  style={{
+                    boxShadow: `0 0 15px hsl(var(--${mode.color}) / 0.3)`,
+                  }}
+                />
+              )}
             </button>
           );
         })}
