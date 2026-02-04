@@ -134,7 +134,13 @@ export const useTMDBSearch = (query: string, page = 1) => {
     queryFn: async () => {
       if (!query.trim()) return [];
       const response = await tmdbService.searchContent(query, page);
-      return response.results
+      
+      // Sort by popularity BEFORE transforming - most popular results first
+      const sortedResults = [...response.results].sort(
+        (a, b) => b.popularity - a.popularity
+      );
+      
+      return sortedResults
         .map(transformTMDBSearchResult)
         .filter((item): item is WatchContent => item !== null);
     },
@@ -239,7 +245,8 @@ export const useTMDBPersonSearch = (query: string, page = 1) => {
     queryFn: async (): Promise<TMDBPerson[]> => {
       if (!query.trim()) return [];
       const response = await tmdbService.searchPerson(query, page);
-      return response.results;
+      // Sort by popularity - most famous actors/actresses first
+      return [...response.results].sort((a, b) => b.popularity - a.popularity);
     },
     enabled: query.trim().length > 0,
     staleTime: STALE_TIME,
