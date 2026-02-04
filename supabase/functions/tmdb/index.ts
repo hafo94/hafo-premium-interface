@@ -20,6 +20,9 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+  
+  // Log key info for debugging (only first/last chars)
+  console.log(`TMDB key length: ${TMDB_API_KEY.length}, starts with: ${TMDB_API_KEY.substring(0, 4)}, ends with: ${TMDB_API_KEY.substring(TMDB_API_KEY.length - 4)}`);
 
   try {
     const url = new URL(req.url);
