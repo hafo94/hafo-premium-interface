@@ -48,10 +48,13 @@ export const FocusProvider = ({ children, mode, hasSidebar }: FocusProviderProps
     setIsSidebarExpanded(activeZone === "sidebar");
   }, [activeZone]);
 
-  // Reset content focus when mode changes
+  // Reset content focus when mode changes, but preserve header focus
   useEffect(() => {
     setContentIndex({ row: -1, col: 0 });
-    setActiveZone("content");
+    // Only reset to content if not currently in header
+    if (activeZone !== "header") {
+      setActiveZone("content");
+    }
   }, [mode]);
 
   const focusHeader = useCallback(() => {
