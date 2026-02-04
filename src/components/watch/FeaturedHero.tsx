@@ -108,8 +108,13 @@ const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleL
               className={cn(
                 'flex items-center gap-2 px-8 py-3 rounded-md font-semibold transition-all duration-200',
                 'bg-foreground text-background hover:bg-foreground/90',
-                isActive && focusedButton === 0 && 'ring-4 ring-nipflix scale-105'
+                isActive && focusedButton === 0 && 'ring-4 ring-nipflix scale-110 z-10'
               )}
+              style={{
+                boxShadow: isActive && focusedButton === 0 
+                  ? '0 0 30px hsl(var(--nipflix) / 0.6), 0 0 60px hsl(var(--nipflix) / 0.3)'
+                  : undefined
+              }}
             >
               <Play className="w-5 h-5" fill="currentColor" />
               {content.progress ? 'Resume' : 'Play'}
@@ -120,8 +125,13 @@ const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleL
               className={cn(
                 'flex items-center gap-2 px-8 py-3 rounded-md font-semibold transition-all duration-200',
                 'bg-muted/60 text-foreground hover:bg-muted/80',
-                isActive && focusedButton === 1 && 'ring-4 ring-nipflix scale-105'
+                isActive && focusedButton === 1 && 'ring-4 ring-nipflix scale-110 z-10'
               )}
+              style={{
+                boxShadow: isActive && focusedButton === 1 
+                  ? '0 0 30px hsl(var(--nipflix) / 0.6), 0 0 60px hsl(var(--nipflix) / 0.3)'
+                  : undefined
+              }}
             >
               <Info className="w-5 h-5" />
               More Info
@@ -134,8 +144,13 @@ const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleL
                 isInList 
                   ? 'border-nipflix bg-nipflix/20 text-nipflix' 
                   : 'border-muted-foreground/40 text-foreground hover:border-foreground',
-                isActive && focusedButton === 2 && 'ring-4 ring-nipflix scale-110'
+                isActive && focusedButton === 2 && 'ring-4 ring-nipflix scale-110 z-10'
               )}
+              style={{
+                boxShadow: isActive && focusedButton === 2 
+                  ? '0 0 30px hsl(var(--nipflix) / 0.6), 0 0 60px hsl(var(--nipflix) / 0.3)'
+                  : undefined
+              }}
             >
               {isInList ? <Check className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
             </button>
