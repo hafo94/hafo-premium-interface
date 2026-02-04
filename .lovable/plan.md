@@ -1,143 +1,113 @@
 
-# Fix "More Like This" Feature
+# Fix Auto-Scroll When New Movies Load
 
 ## Problem
 
-The "More Like This" section in the content detail modal shows placeholder Unsplash images instead of actual similar movies/series. The TMDB API already provides similar content data, but it's not being utilized.
+When new movies are loaded via infinite scroll, the page automatically scrolls the user downward. This happens because the `useEffect` in `ContentGrid.tsx` that scrolls the focused item into view fires whenever the component re-renders, not just when the user explicitly changes focus.
 
-## Root Cause Analysis
+## Root Cause
 
-1. **Edge function is correct** - Already fetches `similar` content via `append_to_response=credits,similar`
-2. **Service types are correct** - `TMDBMovieDetails.similar` and `TMDBSeriesDetails.similar` fields exist
-3. **Transformer ignores similar data** - `transformTMDBMovieDetails` and `transformTMDBSeriesDetails` don't extract similar content
-4. **WatchContent lacks field** - No `similarContent` field in the interface
-5. **Component uses placeholders** - `ContentDetail.tsx` renders fake Unsplash images
+In `ContentGrid.tsx`, this effect triggers scroll on every render where the grid is active:
 
-## Solution Architecture
-
-```text
-TMDB API (similar)
-       ↓
-Edge Function (already includes similar)
-       ↓
-Transformer (NEW: extract & transform similar)
-       ↓
-WatchContent interface (NEW: add similarContent field)
-       ↓
-ContentDetail.tsx (NEW: render real similar content)
+```tsx
+useEffect(() => {
+  if (!isActive || focusedIndex < 0) return;
+  // ... scrolls to focused item
+}, [focusedIndex, isActive]);
 ```
+
+When infinite scroll adds new items, the grid re-renders and this effect fires, scrolling to the focused item even though the user didn't navigate.
+
+## Solution
+
+Track whether the focus change was triggered by user interaction (keyboard/mouse) vs component re-render. Only scroll when focus was explicitly changed by the user.
+
+**Approach**: Use a ref to track if the focus change was intentional
 
 ## Implementation Details
 
-### 1. Update WatchContent Interface (watchContent.ts)
+### File: `src/components/watch/ContentGrid.tsx`
 
-Add a field for similar content:
+1. **Add a ref to track user-initiated focus changes**:
+   ```tsx
+   const userInitiatedFocus = useRef(false);
+   ```
 
-```typescript
-export interface WatchContent {
-  // ... existing fields
-  similarContent?: WatchContent[];  // NEW
-}
-```
+2. **Update the scroll effect to check the ref**:
+   ```tsx
+   useEffect(() => {
+     if (!isActive || focusedIndex < 0) return;
+     if (!userInitiatedFocus.current) return; // Skip if not user-initiated
+     
+     userInitiatedFocus.current = false; // Reset after scrolling
+     
+     const grid = gridRef.current;
+     if (!grid) return;
 
-### 2. Update Transformer Functions (tmdbTransformer.ts)
+     const focusedElement = grid.children[focusedIndex] as HTMLElement;
+     if (focusedElement) {
+       focusedElement.scrollIntoView({
+         behavior: "smooth",
+         block: "center",
+       });
+     }
+   }, [focusedIndex, isActive]);
+   ```
 
-Modify both `transformTMDBMovieDetails` and `transformTMDBSeriesDetails` to include similar content:
+3. **Set the ref when user interacts**:
+   - In `handleMouseEnter`: Set `userInitiatedFocus.current = true` before calling `onFocusChange`
+   - In `handleItemClick`: Set `userInitiatedFocus.current = true` before calling `onFocusChange`
 
-**For movies:**
-```typescript
-export const transformTMDBMovieDetails = (movie: TMDBMovieDetails): WatchContent => ({
-  // ... existing fields
-  similarContent: movie.similar?.results
-    .slice(0, 6)
-    .map(transformTMDBMovie),
-});
-```
+4. **Parent keyboard navigation needs similar flag**:
+   - Update `MoviesContent.tsx` and `SeriesContent.tsx` grid keyboard navigation to pass a signal that focus was user-initiated
+   - Alternatively, modify `onFocusChange` to accept a second parameter indicating user intent
 
-**For series:**
-```typescript
-export const transformTMDBSeriesDetails = (series: TMDBSeriesDetails): WatchContent => ({
-  // ... existing fields
-  similarContent: series.similar?.results
-    .slice(0, 6)
-    .map(transformTMDBSeries),
-});
-```
+### Alternative (Simpler) Approach
 
-### 3. Update ContentDetail Component (ContentDetail.tsx)
+Instead of prop drilling, track the previous `focusedIndex` and only scroll when it actually changes:
 
-Replace the placeholder grid with real similar content that:
-- Shows actual movie/series posters from TMDB
-- Displays title overlay on hover
-- Makes items clickable to view details (optional enhancement)
-
-**Current code (placeholder):**
 ```tsx
-{[1, 2, 3].map((i) => (
-  <div key={i} className="aspect-video bg-muted rounded-md overflow-hidden">
-    <img src={`https://images.unsplash.com/...`} />
-  </div>
-))}
+const prevFocusIndex = useRef(focusedIndex);
+
+useEffect(() => {
+  if (!isActive || focusedIndex < 0) return;
+  
+  // Only scroll if focusedIndex actually changed
+  if (prevFocusIndex.current === focusedIndex) return;
+  prevFocusIndex.current = focusedIndex;
+  
+  const grid = gridRef.current;
+  if (!grid) return;
+
+  const focusedElement = grid.children[focusedIndex] as HTMLElement;
+  if (focusedElement) {
+    focusedElement.scrollIntoView({
+      behavior: "smooth",
+      block: "center",
+    });
+  }
+}, [focusedIndex, isActive]);
 ```
 
-**New code (real content):**
-```tsx
-{content.similarContent && content.similarContent.length > 0 ? (
-  <div className="grid grid-cols-3 gap-3">
-    {content.similarContent.slice(0, 6).map((item) => (
-      <div key={item.id} className="aspect-video bg-muted rounded-md overflow-hidden relative group cursor-pointer">
-        <img
-          src={item.backdrop || item.poster}
-          alt={item.title}
-          className="w-full h-full object-cover transition-transform group-hover:scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-2">
-          <span className="text-xs font-medium text-white line-clamp-2">{item.title}</span>
-        </div>
-      </div>
-    ))}
-  </div>
-) : (
-  <p className="text-sm text-muted-foreground">No similar content available</p>
-)}
-```
-
-### 4. Fetch Details When Opening Modal
-
-Currently the modal receives the basic `WatchContent` from list views which doesn't have similar content. To get the full details including similar content, we need to fetch the details when opening the modal.
-
-Add a hook call in `ContentDetail.tsx`:
-```typescript
-const { data: fullDetails } = useMovieDetails(
-  content.type === 'movie' ? content.tmdbId : undefined
-);
-const { data: seriesDetails } = useSeriesDetails(
-  content.type === 'series' ? content.tmdbId : undefined
-);
-
-// Use enriched content with similar data
-const enrichedContent = fullDetails || seriesDetails || content;
-```
-
-Then use `enrichedContent.similarContent` for the "More Like This" grid.
+This simpler approach works because:
+- When the user navigates, `focusedIndex` changes → scrolls
+- When infinite scroll loads more items, `focusedIndex` stays the same → no scroll
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/data/watchContent.ts` | Add `similarContent?: WatchContent[]` to interface |
-| `src/services/tmdbTransformer.ts` | Extract and transform similar content in detail transformers |
-| `src/components/watch/ContentDetail.tsx` | Fetch full details on mount, render real similar content grid |
+| `src/components/watch/ContentGrid.tsx` | Add `prevFocusIndex` ref, update scroll effect to only fire when focus actually changes |
 
 ## Visual Result
 
 **Before:**
-- 3 faded placeholder images from Unsplash
-- No interactivity
-- Same images for every movie/series
+- Scroll to bottom of page
+- New movies load (infinite scroll)
+- Page jerks back to wherever the focused item is
 
 **After:**
-- Up to 6 actual similar movies/series from TMDB
-- Real backdrop images with title on hover
-- Different recommendations for each content item
-- Fallback message if no similar content available
+- Scroll to bottom of page
+- New movies load smoothly
+- Page stays exactly where you are
+- Only scrolls when you press arrow keys to navigate
