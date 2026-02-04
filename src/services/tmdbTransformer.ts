@@ -134,6 +134,7 @@ export const transformTMDBMovieDetails = (movie: TMDBMovieDetails): WatchContent
   tmdbId: movie.id,
   cast: movie.credits?.cast.slice(0, 5).map((c) => c.name),
   director: movie.credits?.crew.find((c) => c.job === "Director")?.name,
+  similarContent: movie.similar?.results?.slice(0, 6).map(transformTMDBMovie),
 });
 
 export const transformTMDBSeriesDetails = (series: TMDBSeriesDetails): WatchContent => ({
@@ -152,4 +153,5 @@ export const transformTMDBSeriesDetails = (series: TMDBSeriesDetails): WatchCont
   tmdbId: series.id,
   episodes: series.number_of_episodes,
   cast: series.credits?.cast.slice(0, 5).map((c) => c.name),
+  similarContent: series.similar?.results?.slice(0, 6).map(transformTMDBSeries),
 });

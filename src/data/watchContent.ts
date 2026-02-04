@@ -32,6 +32,7 @@ export interface WatchContent {
   cast?: string[];
   director?: string;
   episodes?: number;
+  similarContent?: WatchContent[];
 }
 
 export const genres = [
