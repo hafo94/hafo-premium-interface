@@ -1,145 +1,116 @@
 
-# Add Categories to Movies and Series Sidebar
+
+# Grid View for Categories with Infinite Scroll
 
 ## Overview
 
-Update the sidebar for Movies and Series modes to display categories with all genres permanently visible as sub-items. The sidebar structure will be reorganized and Categories will show genre options without icons, making them visually subordinated to the Categories header.
+Two updates are needed:
+1. **Hide subcategory dots in collapsed sidebar** - Remove the visual clutter of dots when the sidebar is minimized
+2. **Grid layout for category views** - Replace horizontal rows with a scrollable grid when viewing Popular, On Cinema, or genre categories (same for Series)
 
-## Sidebar Structure Changes
+## Changes
 
-**Movies Mode - New Sidebar:**
-```text
-+------------------------+
-| [icon] Search          |
-| [icon] Home            |
-| [icon] Popular         |  <- renamed from Trending
-| [icon] On Cinema       |
-| [icon] Categories      |
-|    Action              |  <- no icon, indented
-|    Animation           |
-|    Comedy              |
-|    Documentary         |
-|    Drama               |
-|    Fantasy             |
-|    Horror              |
-|    Romance             |
-|    Sci-Fi              |
-|    Thriller            |
-+------------------------+
-```
+### 1. Remove Dots in Collapsed Sidebar
 
-**Series Mode - Same Pattern:**
-- Search, Home, Popular, On Air, Categories
-- Genre sub-items: Action & Adventure, Animation, Comedy, Crime, Documentary, Drama, Family, Mystery, Sci-Fi & Fantasy
+**File**: `src/components/ModeSidebar.tsx`
 
-## Implementation Steps
+Current behavior: When the sidebar is collapsed, genre items show small dots as placeholders for icons.
 
-### 1. Update Sidebar Configuration (ModeSidebar.tsx)
+Fix: Simply hide genre sub-items entirely when the sidebar is collapsed, or return `null` instead of rendering the dot.
 
-- Change sidebar item structure to support nested items (categories as children)
-- Rename "Trending" to "Popular" for both modes
-- Remove Movies/Series/Drama/Comedy/Sci-Fi items and replace with Categories + genre children
-- Add new interface for sidebar items with optional `children` property
-- Render category items with different styling (no icons, smaller text, indented)
+The change is in the `renderItem` function around lines 225-238 - when `!isExpanded` and the item is a child (genre), don't render it at all.
 
-### 2. Update Sidebar Keyboard Navigation
+### 2. Create ContentGrid Component
 
-- Handle navigating through category sub-items with arrow keys
-- When entering Categories section, continue down through genre items
-- Track both main item index and sub-item index for navigation
-- Enter key on genre item selects that category
+**New File**: `src/components/watch/ContentGrid.tsx`
 
-### 3. Add Genre-Filtered Content Support
+A new grid component that displays items in a responsive grid layout instead of horizontal rows:
+- Responsive grid: 2-6 columns based on screen width
+- Displays poster images with title overlay on hover/focus
+- Supports keyboard navigation (arrow keys navigate the grid)
+- Accepts items array and handles item selection
 
-**Add to tmdbService.ts:**
-- New `discoverMovies(genreId)` endpoint function
-- New `discoverSeries(genreId)` endpoint function
+### 3. Add Infinite Scroll Hook
 
-**Update Edge Function (tmdb/index.ts):**
-- Add `discover-movies` endpoint with genre filter
-- Add `discover-series` endpoint with genre filter
-- These use TMDB's discover API: `/discover/movie?with_genres={id}`
+**New File**: `src/hooks/useInfiniteContent.ts`
 
-**Add to useTMDB.ts:**
-- `useMoviesByGenre(genreId)` hook
-- `useSeriesByGenre(genreId)` hook
+Create React Query infinite query hooks for pagination:
+- `useInfiniteMoviesByGenre(genreId)` - Fetches movies by genre with pagination
+- `useInfinitePopularMovies()` - Fetches popular movies with pagination  
+- `useInfiniteNowPlayingMovies()` - Fetches now playing movies with pagination
+- Similar hooks for series
 
-### 4. Update Content Components
+Uses `useInfiniteQuery` from TanStack Query to:
+- Track current page
+- Fetch next page when requested
+- Merge results from all pages
 
-**MoviesContent.tsx:**
-- Accept `selectedGenre` prop (genre ID string like "action", "comedy")
-- When a genre is selected, show filtered content for that genre
-- Display genre-specific hero and content rows
-- Map genre IDs: "action" -> 28, "comedy" -> 35, etc.
+### 4. Update MoviesContent Component
 
-**SeriesContent.tsx:**
-- Same pattern as MoviesContent for genre filtering
+**File**: `src/components/content/MoviesContent.tsx`
 
-### 5. Wire Up Navigation Flow
+Logic changes:
+- Detect if viewing a "grid view section" (popular, cinema, or any genre)
+- For grid views:
+  - Replace `visibleCategories` with flat item array
+  - Use the new ContentGrid component
+  - Implement scroll detection to load more pages
+  - Update keyboard navigation for 2D grid (calculate row/col based on grid columns)
+- For home view: Keep existing horizontal row layout
 
-**UnifiedHome.tsx:**
-- Track selected genre alongside activeNavItem
-- Pass genre to content components
-- When a genre sub-item is selected from sidebar, update content view
+### 5. Update SeriesContent Component
+
+**File**: `src/components/content/SeriesContent.tsx`
+
+Same changes as MoviesContent but for series:
+- Grid view for: popular, on-air, and genre categories
+- Home view keeps horizontal rows
 
 ## Technical Details
 
-**Genre ID Mappings (from TMDB):**
+**Grid Navigation Logic**:
+```text
+Grid with 5 columns:
++---+---+---+---+---+
+| 0 | 1 | 2 | 3 | 4 |  <- Row 0
++---+---+---+---+---+
+| 5 | 6 | 7 | 8 | 9 |  <- Row 1
++---+---+---+---+---+
 
-Movies:
-- Action: 28
-- Animation: 16
-- Comedy: 35
-- Documentary: 99
-- Drama: 18
-- Fantasy: 14
-- Horror: 27
-- Romance: 10749
-- Sci-Fi: 878
-- Thriller: 53
-
-Series:
-- Action & Adventure: 10759
-- Animation: 16
-- Comedy: 35
-- Crime: 80
-- Documentary: 99
-- Drama: 18
-- Family: 10751
-- Mystery: 9648
-- Sci-Fi & Fantasy: 10765
-
-**New Sidebar Item Interface:**
-```typescript
-interface SidebarItem {
-  id: string;
-  icon?: LucideIcon;  // optional - genres won't have icons
-  label: string;
-  isCategory?: boolean;  // marks Categories header
-  children?: SidebarItem[];  // genre sub-items
-}
+Arrow Down from index 2 -> index 7 (2 + columns)
+Arrow Up from index 7 -> index 2 (7 - columns)
+Arrow Right from index 3 -> index 4
+Arrow Left from index 5 -> focus sidebar
 ```
 
-**Visual Styling for Genre Items:**
-- No icon
-- Smaller font size (text-xs)
-- Left indent (pl-8 when expanded, centered dot when collapsed)
-- Slightly muted color until focused/active
+**Infinite Scroll Implementation**:
+- Use Intersection Observer on a sentinel element at the bottom
+- When sentinel is visible, call `fetchNextPage()`
+- Show loading spinner while fetching
+- Disable when `hasNextPage` is false
 
-## Files to Modify
+**View Mode Detection**:
+```typescript
+const isGridView = activeSection === "popular" 
+  || activeSection === "cinema" 
+  || activeSection === "on-air"
+  || activeSection.startsWith("genre-");
+```
 
-| File | Changes |
-|------|---------|
-| `src/components/ModeSidebar.tsx` | New item structure, nested items rendering, keyboard nav for sub-items |
-| `supabase/functions/tmdb/index.ts` | Add discover-movies and discover-series endpoints |
-| `src/services/tmdbService.ts` | Add discoverMovies/discoverSeries functions |
-| `src/hooks/useTMDB.ts` | Add useMoviesByGenre/useSeriesByGenre hooks |
-| `src/components/content/MoviesContent.tsx` | Handle genre filtering, genre-specific view |
-| `src/components/content/SeriesContent.tsx` | Handle genre filtering, genre-specific view |
-| `src/components/UnifiedHome.tsx` | Track and pass selected genre to content |
+## File Summary
 
-## New File
+| File | Action | Purpose |
+|------|--------|---------|
+| `src/components/ModeSidebar.tsx` | Modify | Hide genre items when sidebar collapsed |
+| `src/components/watch/ContentGrid.tsx` | Create | Grid layout component with keyboard nav |
+| `src/hooks/useInfiniteContent.ts` | Create | Infinite query hooks for pagination |
+| `src/components/content/MoviesContent.tsx` | Modify | Switch to grid view for categories |
+| `src/components/content/SeriesContent.tsx` | Modify | Switch to grid view for categories |
 
-| File | Purpose |
-|------|---------|
-| `src/data/genreConfig.ts` | Centralized genre definitions, ID mappings, and sidebar config |
+## User Experience
+
+- **Home view**: Horizontal rows for browsing different categories (trending, popular, etc.)
+- **Category view** (Popular, On Cinema, genres): Full-screen grid of content, scroll down to load more
+- **Navigation**: Arrow keys work intuitively in both row and grid layouts
+- **Sidebar**: Clean appearance when collapsed - only main menu items with icons visible
+
