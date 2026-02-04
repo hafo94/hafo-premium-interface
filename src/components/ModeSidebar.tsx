@@ -28,6 +28,14 @@ const sidebarConfig: Record<AppMode, SidebarItem[]> = {
     { id: "series", icon: Tv, label: "Series" },
     { id: "cinema", icon: Clapperboard, label: "On Cinema" },
   ],
+  series: [
+    { id: "search", icon: Search, label: "Search" },
+    { id: "home", icon: Home, label: "Home" },
+    { id: "trending", icon: TrendingUp, label: "Trending" },
+    { id: "drama", icon: Film, label: "Drama" },
+    { id: "comedy", icon: Tv, label: "Comedy" },
+    { id: "scifi", icon: Clapperboard, label: "Sci-Fi" },
+  ],
   tv: [
     { id: "search", icon: Search, label: "Search" },
     { id: "home", icon: Home, label: "Home" },
@@ -38,6 +46,7 @@ const sidebarConfig: Record<AppMode, SidebarItem[]> = {
 
 const modeColors: Record<AppMode, string> = {
   movies: "nipflix",
+  series: "nipflix",
   tv: "tv",
   games: "retro",
 };

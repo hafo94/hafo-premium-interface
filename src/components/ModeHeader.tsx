@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useFocus } from "@/contexts/FocusContext";
 
-export type AppMode = "movies" | "tv" | "games";
+export type AppMode = "movies" | "series" | "tv" | "games";
 
 interface ModeHeaderProps {
   activeMode: AppMode;
@@ -11,6 +11,7 @@ interface ModeHeaderProps {
 
 const modes = [
   { id: "movies" as AppMode, label: "Movies", color: "nipflix" },
+  { id: "series" as AppMode, label: "Series", color: "nipflix" },
   { id: "tv" as AppMode, label: "TV", color: "tv" },
   { id: "games" as AppMode, label: "Games", color: "retro" },
 ];
