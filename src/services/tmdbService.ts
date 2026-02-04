@@ -179,4 +179,8 @@ export const tmdbService = {
   getPersonCredits: async (id: number): Promise<TMDBPersonCredits> => {
     return callTMDB('person-credits', { id: String(id) });
   },
+
+  searchTV: async (query: string, page = 1): Promise<TMDBResponse<TMDBSeries>> => {
+    return callTMDB('search-tv', { query, page: String(page) });
+  },
 };

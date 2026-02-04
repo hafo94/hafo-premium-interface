@@ -133,10 +133,34 @@ export const useTMDBSearch = (query: string, page = 1) => {
     queryKey: ["tmdb", "search", query, page],
     queryFn: async () => {
       if (!query.trim()) return [];
-      const response = await tmdbService.searchContent(query, page);
       
-      // Sort by popularity BEFORE transforming - most popular results first
-      const sortedResults = [...response.results].sort(
+      // Fetch multi-search and TV-specific search in parallel
+      // TV search ensures popular shows like "The White Lotus" appear for "White"
+      const [multiResponse, tvResponse] = await Promise.all([
+        tmdbService.searchContent(query, page),
+        tmdbService.searchTV(query, page),
+      ]);
+      
+      // Transform TV results with media_type added
+      const tvResults = tvResponse.results.map(tv => ({
+        ...tv,
+        media_type: 'tv' as const,
+        popularity: tv.popularity,
+      }));
+      
+      // Merge and deduplicate by ID+type
+      const allResults = [...multiResponse.results, ...tvResults];
+      const seen = new Set<string>();
+      const uniqueResults = allResults.filter(item => {
+        const mediaType = item.media_type || ('title' in item ? 'movie' : 'tv');
+        const key = `${mediaType}-${item.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      
+      // Sort by popularity - most popular results first
+      const sortedResults = uniqueResults.sort(
         (a, b) => b.popularity - a.popularity
       );
       
