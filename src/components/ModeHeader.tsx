@@ -1,5 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
-import { Film, Monitor, Gamepad2 } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 
 export type AppMode = "movies" | "tv" | "games";
@@ -10,9 +9,9 @@ interface ModeHeaderProps {
 }
 
 const modes = [
-  { id: "movies" as AppMode, label: "Movies", icon: Film, color: "nipflix" },
-  { id: "tv" as AppMode, label: "TV", icon: Monitor, color: "tv" },
-  { id: "games" as AppMode, label: "Games", icon: Gamepad2, color: "retro" },
+  { id: "movies" as AppMode, label: "Movies", color: "nipflix" },
+  { id: "tv" as AppMode, label: "TV", color: "tv" },
+  { id: "games" as AppMode, label: "Games", color: "retro" },
 ];
 
 const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
@@ -20,11 +19,30 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
     modes.findIndex((m) => m.id === activeMode)
   );
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
+  const navRef = useRef<HTMLDivElement>(null);
+  const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Update indicator position when active mode changes
+  useEffect(() => {
+    const activeIndex = modes.findIndex((m) => m.id === activeMode);
+    const activeButton = buttonRefs.current[activeIndex];
+    const nav = navRef.current;
+
+    if (activeButton && nav) {
+      const navRect = nav.getBoundingClientRect();
+      const buttonRect = activeButton.getBoundingClientRect();
+      setIndicatorStyle({
+        left: buttonRect.left - navRect.left,
+        width: buttonRect.width,
+      });
+    }
+  }, [activeMode]);
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString("en-US", {
@@ -44,7 +62,6 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
-      // Only handle when not in an input
       if (
         document.activeElement?.tagName === "INPUT" ||
         document.activeElement?.tagName === "TEXTAREA"
@@ -72,70 +89,74 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleKeyDown]);
 
-  // Sync focusedIndex when activeMode changes externally
   useEffect(() => {
     setFocusedIndex(modes.findIndex((m) => m.id === activeMode));
   }, [activeMode]);
 
+  const activeColor = modes.find((m) => m.id === activeMode)?.color || "nipflix";
+
   return (
-    <header className="relative flex items-center justify-between px-6 py-4 z-50">
-      {/* Mode Tabs */}
-      <div className="flex items-center gap-1 p-1 rounded-full glass">
+    <header className="relative flex items-center justify-between px-8 py-5 z-50">
+      {/* Left: Logo */}
+      <h1 className="text-xl font-light tracking-[0.35em] text-gradient animate-breathe">
+        hafo
+      </h1>
+
+      {/* Center: Navigation */}
+      <nav
+        ref={navRef}
+        className="absolute left-1/2 -translate-x-1/2 flex items-center gap-10"
+      >
         {modes.map((mode, index) => {
           const isActive = activeMode === mode.id;
-          const Icon = mode.icon;
 
           return (
             <button
               key={mode.id}
+              ref={(el) => (buttonRefs.current[index] = el)}
               onClick={() => onModeChange(mode.id)}
               className={cn(
-                "relative flex items-center gap-2 px-5 py-2.5 rounded-full",
-                "text-sm font-medium transition-all duration-300",
+                "relative py-2 text-sm font-light tracking-[0.2em] uppercase",
+                "transition-all duration-300 ease-out",
+                "focus:outline-none",
                 isActive
-                  ? `text-${mode.color} bg-${mode.color}/10`
-                  : "text-muted-foreground hover:text-foreground hover:bg-foreground/5"
+                  ? `text-${mode.color}`
+                  : "text-muted-foreground hover:text-foreground/80"
               )}
               style={{
-                boxShadow: isActive
-                  ? `0 0 20px hsl(var(--${mode.color}) / 0.3)`
+                textShadow: isActive
+                  ? `0 0 20px hsl(var(--${mode.color}) / 0.5)`
                   : "none",
               }}
             >
-              <Icon className="w-4 h-4" strokeWidth={1.5} />
-              <span>{mode.label}</span>
-              {isActive && (
-                <span
-                  className={cn(
-                    "absolute inset-0 rounded-full opacity-20",
-                    `bg-${mode.color}`
-                  )}
-                  style={{
-                    background: `radial-gradient(circle at center, hsl(var(--${mode.color}) / 0.15) 0%, transparent 70%)`,
-                  }}
-                />
-              )}
+              {mode.label}
             </button>
           );
         })}
-      </div>
 
-      {/* Right Side - Logo, Time */}
-      <div className="flex items-center gap-6">
-        {/* Time/Date Display */}
-        <div className="text-right hidden sm:block">
-          <div className="text-base font-normal tracking-wide text-foreground/70 tabular-nums">
-            {formatTime(currentTime)}
-          </div>
-          <div className="text-xs font-normal text-foreground/40 tracking-wider">
-            {formatDate(currentTime)}
-          </div>
+        {/* Animated underline indicator */}
+        <span
+          className={cn(
+            "absolute -bottom-1 h-0.5 rounded-full",
+            "transition-all duration-300 ease-out",
+            `bg-${activeColor}`
+          )}
+          style={{
+            left: indicatorStyle.left,
+            width: indicatorStyle.width,
+            boxShadow: `0 0 12px hsl(var(--${activeColor}) / 0.6), 0 0 4px hsl(var(--${activeColor}) / 0.4)`,
+          }}
+        />
+      </nav>
+
+      {/* Right: Time/Date */}
+      <div className="text-right hidden sm:block">
+        <div className="text-base font-light tracking-wide text-foreground/60 tabular-nums">
+          {formatTime(currentTime)}
         </div>
-
-        {/* Logo */}
-        <h1 className="text-xl font-light tracking-[0.35em] text-gradient animate-breathe">
-          hafo
-        </h1>
+        <div className="text-xs font-light text-foreground/35 tracking-wider">
+          {formatDate(currentTime)}
+        </div>
       </div>
     </header>
   );
