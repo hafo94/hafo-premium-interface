@@ -148,4 +148,12 @@ export const tmdbService = {
   searchContent: async (query: string, page = 1): Promise<TMDBResponse<TMDBSearchResult>> => {
     return callTMDB('search', { query, page: String(page) });
   },
+
+  discoverMovies: async (genreId: number, page = 1): Promise<TMDBResponse<TMDBMovie>> => {
+    return callTMDB('discover-movies', { genre_id: String(genreId), page: String(page) });
+  },
+
+  discoverSeries: async (genreId: number, page = 1): Promise<TMDBResponse<TMDBSeries>> => {
+    return callTMDB('discover-series', { genre_id: String(genreId), page: String(page) });
+  },
 };

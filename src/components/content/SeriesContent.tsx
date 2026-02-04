@@ -6,8 +6,9 @@ import SearchOverlay from "@/components/watch/SearchOverlay";
 import { WatchContent } from "@/data/watchContent";
 import { useMyList } from "@/hooks/useMyList";
 import { useFocus } from "@/contexts/FocusContext";
-import { useSeriesPageData } from "@/hooks/useTMDB";
+import { useSeriesPageData, useSeriesByGenre, usePopularSeries, useOnTheAirSeries } from "@/hooks/useTMDB";
 import { Skeleton } from "@/components/ui/skeleton";
+import { getSeriesGenreLabel } from "@/data/genreConfig";
 
 interface SeriesContentProps {
   activeSection: string;
@@ -18,13 +19,29 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
   const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
 
-  // Fetch TMDB data
-  const { popularSeries, trendingSeries, topRatedSeries, onTheAir, isLoading, error } = useSeriesPageData();
+  // Determine if a genre is selected
+  const isGenreSelected = activeSection.startsWith("genre-");
+  const selectedGenreId = isGenreSelected ? activeSection.replace("genre-", "") : undefined;
+
+  // Fetch TMDB data for home view
+  const { popularSeries, trendingSeries, topRatedSeries, onTheAir, isLoading: homeLoading, error: homeError } = useSeriesPageData();
+  
+  // Fetch popular series for "popular" section
+  const { data: popularData, isLoading: popularLoading, error: popularError } = usePopularSeries(1);
+  
+  // Fetch on the air for "on-air" section  
+  const { data: onAirData, isLoading: onAirLoading, error: onAirError } = useOnTheAirSeries(1);
+
+  // Fetch genre-specific data
+  const { data: genreSeries, isLoading: genreLoading, error: genreError } = useSeriesByGenre(selectedGenreId);
 
   // Featured content - use trending series for hero
   const featuredItems = useMemo(() => {
+    if (isGenreSelected && genreSeries) {
+      return genreSeries.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
+    }
     return trendingSeries.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
-  }, [trendingSeries]);
+  }, [trendingSeries, genreSeries, isGenreSelected]);
 
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featuredContent = featuredItems[featuredIndex] || featuredItems[0];
@@ -42,11 +59,52 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
     }
   }, [activeSection]);
 
-  // Build categories including My List
+  // Reset featured index when section changes
+  useEffect(() => {
+    setFeaturedIndex(0);
+  }, [activeSection]);
+
+  // Build categories based on active section
   const visibleCategories = useMemo(() => {
     const allSeries = [...popularSeries, ...trendingSeries, ...topRatedSeries, ...onTheAir];
     const myListItems = allSeries.filter((item) => myList.includes(item.id));
 
+    // Genre view
+    if (isGenreSelected && genreSeries) {
+      const genreLabel = getSeriesGenreLabel(selectedGenreId || "");
+      return [
+        ...(myListItems.length > 0
+          ? [{ id: "my-list", title: "My List", items: myListItems }]
+          : []),
+        { id: "genre-results", title: `${genreLabel} Series`, items: genreSeries },
+      ];
+    }
+
+    // Popular section
+    if (activeSection === "popular") {
+      return [
+        ...(myListItems.length > 0
+          ? [{ id: "my-list", title: "My List", items: myListItems }]
+          : []),
+        ...(popularData && popularData.length > 0
+          ? [{ id: "popular", title: "Popular Series", items: popularData }]
+          : []),
+      ];
+    }
+
+    // On Air section
+    if (activeSection === "on-air") {
+      return [
+        ...(myListItems.length > 0
+          ? [{ id: "my-list", title: "My List", items: myListItems }]
+          : []),
+        ...(onAirData && onAirData.length > 0
+          ? [{ id: "on-the-air", title: "Currently Airing", items: onAirData }]
+          : []),
+      ];
+    }
+
+    // Home view (default)
     const categories = [
       ...(myListItems.length > 0
         ? [{ id: "my-list", title: "My List", items: myListItems }]
@@ -66,7 +124,7 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
     ];
 
     return categories;
-  }, [myList, popularSeries, trendingSeries, topRatedSeries, onTheAir]);
+  }, [myList, popularSeries, trendingSeries, topRatedSeries, onTheAir, isGenreSelected, genreSeries, selectedGenreId, activeSection, popularData, onAirData]);
 
   // Auto-rotate featured content
   useEffect(() => {
@@ -158,6 +216,10 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
     },
     [setActiveZone, setContentIndex]
   );
+
+  // Determine loading state
+  const isLoading = homeLoading || (isGenreSelected && genreLoading) || (activeSection === "popular" && popularLoading) || (activeSection === "on-air" && onAirLoading);
+  const error = homeError || genreError || popularError || onAirError;
 
   // Loading skeleton
   if (isLoading) {

@@ -94,6 +94,28 @@ serve(async (req) => {
       case "genres-tv":
         tmdbUrl = `${TMDB_BASE_URL}/genre/tv/list`;
         break;
+      case "discover-movies": {
+        const genreId = url.searchParams.get("genre_id");
+        if (!genreId) {
+          return new Response(
+            JSON.stringify({ error: "Genre ID required" }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        tmdbUrl = `${TMDB_BASE_URL}/discover/movie?with_genres=${genreId}&sort_by=popularity.desc&page=${page}`;
+        break;
+      }
+      case "discover-series": {
+        const genreId = url.searchParams.get("genre_id");
+        if (!genreId) {
+          return new Response(
+            JSON.stringify({ error: "Genre ID required" }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        tmdbUrl = `${TMDB_BASE_URL}/discover/tv?with_genres=${genreId}&sort_by=popularity.desc&page=${page}`;
+        break;
+      }
       default:
         return new Response(
           JSON.stringify({ error: "Invalid endpoint" }),
