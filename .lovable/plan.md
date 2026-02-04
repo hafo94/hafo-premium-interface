@@ -1,199 +1,166 @@
 
 
-# Full Arrow Key & TV Remote Navigation
+# UI Polish: Button Highlights, Content Row Overflow & Collapsible Sidebar
 
 ## Overview
-Create a unified, TV-first navigation system that allows the entire app to be controlled with arrow keys and Enter - perfect for TV remotes on your Raspberry Pi. The system will manage focus across all UI zones (header, sidebar, content) seamlessly.
+Address three UI issues to improve the visual polish and usability of the app:
+1. Add focus highlight to Play/Resume button in the hero section
+2. Fix cropped selection outlines on content rows by using proper overflow handling
+3. Make the sidebar minimized by default, expanding only when focused
 
-## Current State Analysis
+## Issue 1: Play/Resume Button Highlight
 
-| Component | Arrow Key Support | Status |
-|-----------|------------------|--------|
-| ModeHeader | Alt + Left/Right only | Partial (needs Alt) |
-| ModeSidebar | Up/Down + Enter | Working |
-| MoviesContent | Full grid navigation | Working |
-| TVContent | No arrow navigation | Missing |
-| GamesContent | No keyboard support | Missing |
-| TVPlayer | Full keyboard support | Working |
+**Current State:**
+The FeaturedHero component already has focus highlight code (`ring-4 ring-nipflix scale-105`) on line 111, but it may not be visible enough or working correctly.
 
-**The core issue**: Each component handles its own keyboard events independently, leading to conflicts. We need a unified focus manager.
+**Solution:**
+Enhance the visual feedback on the focused Play/Resume button with:
+- Stronger glow effect using box-shadow
+- More prominent scale transform
+- Ensure the ring is clearly visible against the button background
 
-## Solution Architecture
+**File:** `src/components/watch/FeaturedHero.tsx`
 
+**Changes:**
+- Add a glowing shadow effect when focused
+- Increase scale to 1.08 for more prominence
+- Add text glow for better visibility
+
+## Issue 2: Content Row Selection Outlines Getting Cropped
+
+**Current State:**
+In `ContentRow.tsx`, the container uses `overflow-x-auto` (line 50), but when items scale up with `scale-110` and add a `ring-4` outline, the ring gets cropped by the container's overflow boundaries.
+
+**Problem Visualization:**
 ```text
-┌─────────────────────────────────────────────────────────────┐
-│                      Focus Manager (Context)                 │
-│                                                             │
-│   Tracks: activeZone = 'header' | 'sidebar' | 'content'    │
-│                                                             │
-│   Rules:                                                    │
-│   • ArrowUp from content row 0 → focus sidebar/header       │
-│   • ArrowLeft from sidebar → stay (wrap)                    │
-│   • ArrowRight from sidebar → focus content                 │
-│   • Enter anywhere → activate focused item                  │
-│   • Escape → go back one level                             │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┼─────────────────────┐
-        ▼                     ▼                     ▼
-   ┌─────────┐          ┌──────────┐          ┌─────────┐
-   │ Header  │◄─────────│ Sidebar  │◄─────────│ Content │
-   │  tabs   │          │  items   │          │  grid   │
-   └─────────┘          └──────────┘          └─────────┘
-        │                     │                     │
-        └─────────────────────┼─────────────────────┘
-                              │
-                     Left/Right switches
-                     between header tabs
+Container with overflow-hidden/auto:
+┌────────────────────────────────┐
+│  [1] [2] [█3█] [4] [5]         │  ← Ring on [3] is cropped
+│         ╔═══╗                  │     at top and bottom
+│         ║   ║ (ring clipped)   │
+└────────────────────────────────┘
 ```
 
-## Implementation Plan
+**Solution:**
+- Add padding to the scroll container to allow space for the scaled items and rings
+- Use `overflow: visible` on the row wrapper with a parent that clips horizontally only
+- Apply `z-index` to ensure focused items render above siblings
 
-### 1. Create Focus Manager Context
-New file: `src/contexts/FocusContext.tsx`
+**File:** `src/components/watch/ContentRow.tsx`
 
-- Create a context to track which zone is currently focused: `header` | `sidebar` | `content`
-- Track focused indices within each zone
-- Provide methods to move focus between zones
-- Remember last focused item when returning to a zone
+**Changes:**
+- Add vertical padding (`py-4`) to the scroll container to accommodate scale and ring
+- Wrap in a container with `overflow-x-auto overflow-y-visible` or use clip-path
+- Increase z-index on focused items
 
-### 2. Update Header Navigation
-Modify: `src/components/ModeHeader.tsx`
+## Issue 3: Collapsible Sidebar (Minimized by Default)
 
-- Remove Alt key requirement (plain Left/Right when header is focused)
-- Accept focus from FocusContext
-- Add visual focus indicator (subtle glow/ring) on focused tab
-- Arrow Down → move focus to sidebar or content
-- Left/Right → switch tabs directly
+**Current State:**
+The sidebar is always expanded at 208px (`w-52`), taking up content space even when not in use.
 
-### 3. Update Sidebar Navigation  
-Modify: `src/components/ModeSidebar.tsx`
+**Desired Behavior:**
+- Sidebar starts minimized (icons only, ~64px wide)
+- When user navigates left (ArrowLeft from content), sidebar expands
+- When user navigates right (ArrowRight from sidebar), sidebar collapses
+- Show labels only when expanded
+- Smooth transition animation
 
-- Already has Up/Down/Enter - keep this working
-- Add: Arrow Right → focus content area
-- Add: Arrow Up from top item → focus header
-- Show clear focus state (already has this)
+**Implementation:**
 
-### 4. Add TV Content Navigation
-Modify: `src/components/content/TVContent.tsx`
+### FocusContext Changes
+Add `isSidebarExpanded` state that:
+- Defaults to `false` (collapsed)
+- Becomes `true` when `activeZone === "sidebar"`
+- Becomes `false` when navigating away from sidebar
 
-- Add grid navigation for channel cards (Left/Right/Up/Down)
-- Track focused channel index
-- Enter → select channel and open player
-- Arrow Left at first column → focus sidebar
-- Arrow Up at top row → focus sidebar
+### ModeSidebar Changes
+- Accept `isExpanded` prop or derive from focus state
+- Collapsed state: `w-16` with icons only centered
+- Expanded state: `w-52` with icons + labels
+- Animate width with CSS transition
+- Show/hide labels based on expanded state
+- Add hover effect to auto-expand on mouse hover
 
-### 5. Add Games Content Navigation
-Modify: `src/components/content/GamesContent.tsx`
+### UnifiedHome Changes
+- Adjust content padding dynamically based on sidebar expansion state
+- Collapsed: `pl-16`
+- Expanded: `pl-52`
 
-- Simple Up/Down between two buttons (Retro/Steam)
-- Enter → navigate to selected page
-- Left → focus header (no sidebar in games mode)
-- Show focus ring on selected button
+**Visual Design:**
 
-### 6. Update UnifiedHome with Focus Provider
-Modify: `src/components/UnifiedHome.tsx`
+```text
+Collapsed (default):         Expanded (when focused):
+┌────────┐                   ┌──────────────────────┐
+│   🔍   │                   │   🔍   Search        │
+│   🏠   │        →          │   🏠   Home          │
+│   📈   │                   │   📈   Trending      │
+│   🎬   │                   │   🎬   Movies        │
+└────────┘                   └──────────────────────┘
+   64px                              208px
+```
 
-- Wrap app with FocusProvider
-- Pass focus state to child components
-- Handle global navigation between zones
+## File Changes Summary
 
-## Keyboard Mapping (TV Remote Compatible)
+### `src/components/watch/FeaturedHero.tsx`
+- Enhance button focus styles with stronger glow and scale
 
-| Key | Action |
-|-----|--------|
-| ← → | Navigate horizontally / Switch header tabs |
-| ↑ ↓ | Navigate vertically / Move between zones |
-| Enter | Select / Activate focused item |
-| Escape | Go back / Close overlay |
-| Backspace | Go back (alternative to Escape) |
+### `src/components/watch/ContentRow.tsx`
+- Add vertical padding to scroll container for ring overflow
+- Ensure proper z-index layering for focused items
+- Adjust container overflow handling
 
-**TV Remote Mapping** (most remotes send these keys):
-- D-pad → Arrow keys
-- OK/Select → Enter
-- Back → Escape or Backspace
-- Menu → Could open settings overlay
+### `src/contexts/FocusContext.tsx`
+- Add `isSidebarExpanded` state
+- Auto-expand when sidebar is focused
+- Auto-collapse when leaving sidebar
 
-## Visual Focus Indicators
+### `src/components/ModeSidebar.tsx`
+- Add collapsed/expanded visual states
+- Animate width transition
+- Show/hide labels based on state
+- Add hover-to-expand behavior
 
-All focusable elements will have clear visual states:
-
-1. **Header tabs**: Underline + glow when focused (not just when active)
-2. **Sidebar items**: Background highlight + left border when focused
-3. **Channel cards**: Ring + scale up when focused
-4. **Game buttons**: Ring + glow when focused
-5. **Content tiles**: Ring + scale up (already exists in Movies)
+### `src/components/UnifiedHome.tsx`
+- Dynamic content padding based on sidebar expansion
 
 ## Technical Details
 
-### Focus Flow Logic
-```typescript
-// When ArrowRight is pressed in sidebar:
-if (activeZone === 'sidebar') {
-  setActiveZone('content');
-  // Content remembers its last focused item
-}
-
-// When ArrowUp is pressed at top of content:
-if (activeZone === 'content' && focusedRow === 0) {
-  setActiveZone('sidebar');
-}
-
-// When ArrowUp is pressed at top of sidebar:
-if (activeZone === 'sidebar' && focusedIndex === 0) {
-  setActiveZone('header');
-}
+### Button Focus Enhancement
+```tsx
+// FeaturedHero.tsx - Play button
+className={cn(
+  'flex items-center gap-2 px-8 py-3 rounded-md font-semibold transition-all duration-200',
+  'bg-foreground text-background hover:bg-foreground/90',
+  isActive && focusedButton === 0 && 'scale-110 ring-4 ring-nipflix'
+)}
+style={{
+  boxShadow: isActive && focusedButton === 0 
+    ? '0 0 30px hsl(var(--nipflix) / 0.6), 0 0 60px hsl(var(--nipflix) / 0.3)'
+    : undefined
+}}
 ```
 
-### Auto-Focus on Load
-- On app load: Focus starts on first content item (most common use case)
-- After mode change: Focus moves to first content item in new mode
-- After closing overlay: Focus returns to previously focused item
-
-## Files to Create
-1. `src/contexts/FocusContext.tsx` - Focus management context
-
-## Files to Modify
-1. `src/components/UnifiedHome.tsx` - Add FocusProvider wrapper
-2. `src/components/ModeHeader.tsx` - Zone-aware focus, remove Alt requirement
-3. `src/components/ModeSidebar.tsx` - Add Right arrow to content, Up to header
-4. `src/components/content/TVContent.tsx` - Add full grid navigation
-5. `src/components/content/GamesContent.tsx` - Add Up/Down between buttons
-6. `src/components/tv/ChannelCard.tsx` - Add focus prop styling
-
-## Navigation Diagram
-
-```text
-Games Mode (no sidebar):
-┌──────────────────────────────────────┐
-│         [Movies] [TV] [Games]        │  ← Left/Right
-│              ↑                       │
-│              ↓                       │
-│    ┌──────────────────────────┐     │
-│    │   [ Retro Games ]        │     │  ← Up/Down
-│    │   [ Steam Link  ]        │     │
-│    └──────────────────────────┘     │
-└──────────────────────────────────────┘
-
-Movies/TV Mode (with sidebar):
-┌──────────────────────────────────────┐
-│         [Movies] [TV] [Games]        │  ← Left/Right
-│              ↑                       │
-│    ↓─────────┴───────────↓          │
-│  ┌──────┐    ┌───────────────────┐  │
-│  │Search│ →  │ Content Grid      │  │
-│  │Home  │ ←  │ [1][2][3][4][5]   │  │
-│  │...   │    │ [A][B][C][D][E]   │  │
-│  └──────┘    └───────────────────┘  │
-│     ↑↓            ↑↓ ←→             │
-└──────────────────────────────────────┘
+### Content Row Overflow Fix
+```tsx
+// ContentRow.tsx - Container structure
+<div className="mb-8">
+  <h2>...</h2>
+  {/* Outer container clips X, allows Y overflow */}
+  <div className="overflow-x-auto overflow-y-visible py-4 -my-4">
+    <div className="flex gap-2 px-12 py-4">
+      {/* Items with scale will have room to grow */}
+    </div>
+  </div>
+</div>
 ```
 
-## Testing Considerations
-- Test with physical TV remote via Raspberry Pi
-- Ensure focus is always visible (never lost)
-- Test rapid key presses (debouncing if needed)
-- Test all mode transitions
-- Test overlay open/close focus restoration
+### Sidebar Expansion Logic
+```tsx
+// In FocusContext
+const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+
+useEffect(() => {
+  setIsSidebarExpanded(activeZone === "sidebar");
+}, [activeZone]);
+```
 
