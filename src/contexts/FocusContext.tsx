@@ -16,11 +16,13 @@ interface FocusContextValue {
   sidebarIndex: number;
   contentIndex: { row: number; col: number };
   isSidebarExpanded: boolean;
+  isSearchMode: boolean;
   
   setActiveZone: (zone: FocusZone) => void;
   setHeaderIndex: (index: number) => void;
   setSidebarIndex: (index: number) => void;
   setContentIndex: (index: { row: number; col: number }) => void;
+  setSearchMode: (value: boolean) => void;
   
   // Zone transition helpers
   focusHeader: () => void;
@@ -41,12 +43,10 @@ export const FocusProvider = ({ children, mode, hasSidebar }: FocusProviderProps
   const [headerIndex, setHeaderIndex] = useState(0);
   const [sidebarIndex, setSidebarIndex] = useState(1); // Default to "home" (index 1)
   const [contentIndex, setContentIndex] = useState({ row: -1, col: 0 }); // -1 = hero
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [isSearchMode, setSearchMode] = useState(false);
 
-  // Expand/collapse sidebar based on active zone
-  useEffect(() => {
-    setIsSidebarExpanded(activeZone === "sidebar");
-  }, [activeZone]);
+  // Expand/collapse sidebar based on active zone or search mode
+  const isSidebarExpanded = activeZone === "sidebar" || isSearchMode;
 
   // Reset content focus when mode changes, but preserve header focus
   useEffect(() => {
@@ -77,10 +77,12 @@ export const FocusProvider = ({ children, mode, hasSidebar }: FocusProviderProps
     sidebarIndex,
     contentIndex,
     isSidebarExpanded,
+    isSearchMode,
     setActiveZone,
     setHeaderIndex,
     setSidebarIndex,
     setContentIndex,
+    setSearchMode,
     focusHeader,
     focusSidebar,
     focusContent,
@@ -100,10 +102,12 @@ const defaultFocusValue: FocusContextValue = {
   sidebarIndex: 1,
   contentIndex: { row: -1, col: 0 },
   isSidebarExpanded: false,
+  isSearchMode: false,
   setActiveZone: () => {},
   setHeaderIndex: () => {},
   setSidebarIndex: () => {},
   setContentIndex: () => {},
+  setSearchMode: () => {},
   focusHeader: () => {},
   focusSidebar: () => {},
   focusContent: () => {},

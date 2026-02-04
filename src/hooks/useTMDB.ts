@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { tmdbService } from "@/services/tmdbService";
+import { tmdbService, TMDBPerson, TMDBPersonCredits } from "@/services/tmdbService";
 import { 
   transformTMDBMovie, 
   transformTMDBSeries, 
@@ -230,4 +230,52 @@ export const useSeriesPageData = () => {
     isLoading,
     error,
   };
+};
+
+// Person search hook
+export const useTMDBPersonSearch = (query: string, page = 1) => {
+  return useQuery({
+    queryKey: ["tmdb", "search-person", query, page],
+    queryFn: async (): Promise<TMDBPerson[]> => {
+      if (!query.trim()) return [];
+      const response = await tmdbService.searchPerson(query, page);
+      return response.results;
+    },
+    enabled: query.trim().length > 0,
+    staleTime: STALE_TIME,
+  });
+};
+
+// Person credits hook
+export const usePersonCredits = (personId: number | undefined) => {
+  return useQuery({
+    queryKey: ["tmdb", "person-credits", personId],
+    queryFn: async (): Promise<WatchContent[]> => {
+      if (!personId) throw new Error("Person ID required");
+      const response: TMDBPersonCredits = await tmdbService.getPersonCredits(personId);
+      
+      // Transform and deduplicate credits
+      const allCredits = [...response.cast, ...response.crew];
+      const seen = new Set<number>();
+      const uniqueCredits: WatchContent[] = [];
+      
+      for (const credit of allCredits) {
+        if (seen.has(credit.id)) continue;
+        seen.add(credit.id);
+        
+        // Determine if it's a movie or series
+        const isMovie = credit.media_type === "movie" || "title" in credit;
+        if (isMovie) {
+          uniqueCredits.push(transformTMDBMovie(credit as any));
+        } else {
+          uniqueCredits.push(transformTMDBSeries(credit as any));
+        }
+      }
+      
+      // Sort by popularity
+      return uniqueCredits.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    },
+    enabled: !!personId,
+    staleTime: STALE_TIME,
+  });
 };

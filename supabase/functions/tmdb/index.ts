@@ -116,6 +116,24 @@ serve(async (req) => {
         tmdbUrl = `${TMDB_BASE_URL}/discover/tv?with_genres=${genreId}&sort_by=popularity.desc&page=${page}`;
         break;
       }
+      case "search-person":
+        if (!query) {
+          return new Response(
+            JSON.stringify({ error: "Search query required" }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        tmdbUrl = `${TMDB_BASE_URL}/search/person?query=${encodeURIComponent(query)}&page=${page}`;
+        break;
+      case "person-credits":
+        if (!id) {
+          return new Response(
+            JSON.stringify({ error: "Person ID required" }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        tmdbUrl = `${TMDB_BASE_URL}/person/${id}/combined_credits`;
+        break;
       default:
         return new Response(
           JSON.stringify({ error: "Invalid endpoint" }),
