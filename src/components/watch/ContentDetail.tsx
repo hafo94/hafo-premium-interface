@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Play, Plus, Check, ThumbsUp, ChevronDown, ChevronUp, Volume2 } from 'lucide-react';
 import { WatchContent, Season, Episode } from '@/data/watchContent';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
     content.seasons?.[0]?.id || null
   );
   const [focusedButton, setFocusedButton] = useState(0);
+  const contentScrollRef = React.useRef<HTMLDivElement>(null);
 
   const buttons = ['play', 'add', 'like', 'mute'];
 
@@ -33,6 +34,14 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
         case 'ArrowRight':
           e.preventDefault();
           setFocusedButton((prev) => Math.min(buttons.length - 1, prev + 1));
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          contentScrollRef.current?.scrollBy({ top: -100, behavior: 'smooth' });
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          contentScrollRef.current?.scrollBy({ top: 100, behavior: 'smooth' });
           break;
         case 'Enter':
           e.preventDefault();
@@ -59,7 +68,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center py-8 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-background/80 backdrop-blur-sm"
@@ -67,9 +76,9 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-3xl mx-4 bg-card rounded-lg overflow-hidden shadow-2xl animate-fade-in-scale">
+      <div className="relative w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col bg-card rounded-lg overflow-hidden shadow-2xl animate-fade-in-scale">
         {/* Hero Backdrop */}
-        <div className="relative aspect-video">
+        <div className="relative aspect-video flex-shrink-0">
           <img
             src={content.backdrop}
             alt=""
@@ -156,7 +165,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
         </div>
 
         {/* Content info */}
-        <div className="p-6">
+        <div ref={contentScrollRef} className="p-6 flex-1 overflow-y-auto">
           <div className="flex gap-8 mb-6">
             {/* Left column - metadata */}
             <div className="flex-1">
