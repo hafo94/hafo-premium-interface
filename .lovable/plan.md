@@ -1,83 +1,76 @@
 
-# Center Content Detail Modal and Fix Runtime Display
+# Fix Content Detail Modal Centering for TV Remote
 
-## Overview
+## Problem
 
-Two fixes are needed:
-1. Center the content detail popup modal vertically on the screen
-2. Fix the runtime display - show formatted hours/minutes when available, hide when not available (0 or undefined)
+The current modal can grow taller than the screen (especially for series with episodes). The `overflow-y-auto` on the outer container allows mouse scrolling, but TV remotes cannot scroll the page. The modal needs to:
+1. Always be centered on screen
+2. Have a maximum height that fits within the viewport
+3. Make internal content scrollable with keyboard navigation
 
-## Current Issues
+## Solution
 
-### Modal Positioning
-The modal container uses `items-start` which aligns the modal to the top of the viewport. This causes it to appear at the top instead of vertically centered.
+Restructure the modal to have a fixed maximum height with internal scrolling:
 
-### Runtime Display
-The TMDB list endpoints (popular, trending, etc.) don't include `runtime` data - only the detail endpoints do. The transformer sets `runtime: 0` as a placeholder for list items. This means most content shows "0m" in the metadata section.
+**Current structure:**
+```text
+fixed container (overflow-y-auto) -> centers modal
+  modal (no height constraint) -> can grow infinitely
+    hero image
+    content sections
+```
+
+**New structure:**
+```text
+fixed container -> centers modal
+  modal (max-h-[90vh], flex column)
+    hero image (flex-shrink-0)
+    scrollable content area (flex-1, overflow-y-auto)
+```
 
 ## Implementation Details
 
-### 1. Center the Modal (ContentDetail.tsx)
+### File: `src/components/watch/ContentDetail.tsx`
 
-Change the outer container from:
-```css
-flex items-start justify-center pt-8 pb-8
-```
+1. **Remove scroll from outer container**
+   - Change: `overflow-y-auto` -> no overflow (just centering)
+   
+2. **Add height constraint to modal**
+   - Add: `max-h-[90vh] flex flex-col` to the modal container
+   
+3. **Keep hero section fixed**
+   - Add: `flex-shrink-0` to the hero backdrop section so it doesn't compress
+   
+4. **Make content section scrollable**
+   - Add: `flex-1 overflow-y-auto` to the `p-6` content section
+   - This allows the metadata, episodes, and "More Like This" to scroll independently
 
-To:
-```css
-flex items-center justify-center py-8
-```
+### Keyboard Navigation Enhancement
 
-This centers the modal both horizontally and vertically within the viewport.
-
-### 2. Conditional Runtime Display (ContentDetail.tsx)
-
-In the metadata section, only render the runtime if it exists and is greater than 0:
-
-**Current code:**
-```tsx
-<span className="text-muted-foreground">{formatRuntime(content.runtime)}</span>
-```
-
-**New code:**
-```tsx
-{content.runtime && content.runtime > 0 && (
-  <span className="text-muted-foreground">{formatRuntime(content.runtime)}</span>
-)}
-```
-
-Also update the progress bar section that references runtime - only show it when runtime exists:
-
-**Current code (line 106-108):**
-```tsx
-<span className="text-sm text-muted-foreground">
-  {Math.round((content.progress / 100) * content.runtime)}m of {formatRuntime(content.runtime)}
-</span>
-```
-
-**New code:**
-```tsx
-{content.runtime && content.runtime > 0 && (
-  <span className="text-sm text-muted-foreground">
-    {Math.round((content.progress / 100) * content.runtime)}m of {formatRuntime(content.runtime)}
-  </span>
-)}
-```
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `src/components/watch/ContentDetail.tsx` | Center modal, conditionally render runtime |
+Add arrow up/down handling for scrolling the content area when focused:
+- When focused on the content (not buttons), ArrowUp/Down scrolls the internal scroll area
+- This enables TV remote users to navigate through episodes and related content
 
 ## Visual Result
 
-**Before:**
-- Modal appears at top of screen with padding
-- Shows "0m" for runtime on most content
+```text
++----------------------------------+
+|  [Backdrop Image - Fixed Size]  |
+|  Title + Action Buttons          |
++----------------------------------+
+|  Metadata / Plot                 |  <-- This area scrolls
+|  Episodes (Season 1, 2...)       |      with arrow keys
+|  More Like This                  |
++----------------------------------+
+```
 
-**After:**
-- Modal centered vertically and horizontally
-- Runtime only appears when the data is available (e.g., for detailed content or locally-defined content with runtime values)
-- Clean metadata row without empty/zero runtime values
+The modal will always be perfectly centered regardless of content length, and the internal scroll ensures all content is accessible via keyboard/remote.
+
+## Technical Summary
+
+| Change | Current | New |
+|--------|---------|-----|
+| Outer container | `overflow-y-auto` | No overflow |
+| Modal | No height limit | `max-h-[90vh] flex flex-col` |
+| Hero section | Default | `flex-shrink-0` |
+| Content section | `p-6` | `p-6 flex-1 overflow-y-auto` |
