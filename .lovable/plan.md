@@ -1,120 +1,172 @@
 
-# Fix Search Results Image Flickering
+# Search Layout Redesign + White Lotus Search Fix
 
-## Problem
+## Overview
 
-When typing in search, the movie/actor images flicker (disappear and reappear quickly). This creates a jarring visual experience.
+This plan addresses two issues:
+1. **Layout Change**: Move the keyboard to the left side and add a dedicated suggested search results area on the right that is clickable
+2. **Search Relevance**: Fix the issue where popular shows like "The White Lotus" don't appear when searching "White"
 
-## Root Cause Analysis
+---
 
-1. **React Query clears data on new queries** - When the search term changes, the previous results become `undefined` while new results load, causing images to unmount and remount
+## Problem Analysis
 
-2. **No loading placeholder for images** - Images render without a background placeholder, so they flash from empty to loaded
+### Layout Issue
+Currently, the search overlay has this structure:
+- Search type toggle (top)
+- Search input (top)
+- Full-width keyboard (center)
+- Full-width results (below keyboard)
 
-3. **No smooth transition** - There's no fade-in animation when images load
+### White Lotus Search Issue
+The TMDB `/search/multi` endpoint returns results by **text relevance**, not popularity. When you search "White":
+- TMDB returns movies/shows with "White" in the title, ordered by relevance
+- Even with client-side popularity sorting, "The White Lotus" may not be on page 1 of TMDB's results
+- Solution: Use **TV-specific search** (`/search/tv`) in parallel with multi-search to ensure TV shows like "The White Lotus" are found
+
+---
 
 ## Solution
 
-### 1. Keep Previous Data While Loading (React Query)
+### 1. New Layout Structure
 
-Add `placeholderData` option to preserve the previous search results while new ones are loading:
+```text
++------------------------------------------+
+| [Titles] [People]    Search input      X |
++------------------------------------------+
+|                  |                       |
+|   ON-SCREEN      |   SUGGESTED RESULTS   |
+|   KEYBOARD       |   (Live updating)     |
+|                  |                       |
+|  [1][2][3]...    |  +-------+  +-------+ |
+|  [Q][W][E]...    |  | Movie |  | Movie | |
+|  [A][S][D]...    |  +-------+  +-------+ |
+|  [Z][X]...[DEL]  |  +-------+  +-------+ |
+|                  |  | Show  |  | Show  | |
+|                  |  +-------+  +-------+ |
+|                  |          ...          |
++------------------------------------------+
+```
+
+- **Left side (40%)**: Compact on-screen keyboard
+- **Right side (60%)**: Scrollable results grid that updates as you type
+
+### 2. Search API Enhancement
+
+Add parallel TV-specific search to ensure popular TV shows appear:
+
+**File: `src/services/tmdbService.ts`**
+Add new endpoint:
+```typescript
+searchTV: async (query: string, page = 1): Promise<TMDBResponse<TMDBSeries>> => {
+  return callTMDB('search-tv', { query, page: String(page) });
+}
+```
+
+**File: `supabase/functions/tmdb/index.ts`**
+Add case for TV search:
+```typescript
+case "search-tv":
+  if (!query) {
+    return new Response(
+      JSON.stringify({ error: "Search query required" }),
+      { status: 400, ... }
+    );
+  }
+  tmdbUrl = `${TMDB_BASE_URL}/search/tv?query=${encodeURIComponent(query)}&page=${page}`;
+  break;
+```
+
+### 3. Merge and Deduplicate Results
 
 **File: `src/hooks/useTMDB.ts`**
 
-```typescript
-import { useQuery, keepPreviousData } from "@tanstack/react-query";
+Update `useTMDBSearch` to:
+1. Call both `/search/multi` AND `/search/tv` in parallel
+2. Merge results, removing duplicates by ID
+3. Sort by popularity
 
+```typescript
 export const useTMDBSearch = (query: string, page = 1) => {
   return useQuery({
     queryKey: ["tmdb", "search", query, page],
-    queryFn: async () => { /* ... */ },
+    queryFn: async () => {
+      if (!query.trim()) return [];
+      
+      // Fetch multi-search and TV-specific search in parallel
+      const [multiResponse, tvResponse] = await Promise.all([
+        tmdbService.searchContent(query, page),
+        tmdbService.searchTV(query, page),
+      ]);
+      
+      // Transform TV results with media_type added
+      const tvResults = tvResponse.results.map(tv => ({
+        ...tv,
+        media_type: 'tv' as const,
+      }));
+      
+      // Merge and deduplicate
+      const allResults = [...multiResponse.results, ...tvResults];
+      const seen = new Set<string>();
+      const uniqueResults = allResults.filter(item => {
+        const key = `${item.media_type || 'unknown'}-${item.id}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+      
+      // Sort by popularity
+      const sortedResults = uniqueResults.sort(
+        (a, b) => b.popularity - a.popularity
+      );
+      
+      return sortedResults
+        .map(transformTMDBSearchResult)
+        .filter((item): item is WatchContent => item !== null);
+    },
     enabled: query.trim().length > 0,
     staleTime: STALE_TIME,
-    placeholderData: keepPreviousData, // ADD THIS
-  });
-};
-
-export const useTMDBPersonSearch = (query: string, page = 1) => {
-  return useQuery({
-    queryKey: ["tmdb", "search-person", query, page],
-    queryFn: async () => { /* ... */ },
-    enabled: query.trim().length > 0,
-    staleTime: STALE_TIME,
-    placeholderData: keepPreviousData, // ADD THIS
+    placeholderData: keepPreviousData,
   });
 };
 ```
 
-This keeps the old results visible while new ones are fetching, eliminating the flash to empty state.
-
-### 2. Add Image Loading Placeholder & Fade-In
-
-Add a background color to image containers and a fade-in animation when images load:
-
-**File: `src/components/watch/SearchOverlay.tsx`**
-
-For content results:
-```tsx
-<button
-  key={item.id}
-  className={cn(
-    'relative aspect-video rounded-lg overflow-hidden',
-    'bg-muted/50', // ADD: Background placeholder
-    // ... rest of classes
-  )}
->
-  <img
-    src={item.backdrop || item.poster}
-    alt={item.title}
-    className="w-full h-full object-cover transition-opacity duration-300"
-    loading="lazy"
-    onLoad={(e) => {
-      (e.target as HTMLImageElement).style.opacity = '1';
-    }}
-    style={{ opacity: 0 }} // Start invisible, fade in on load
-    onError={(e) => {
-      (e.target as HTMLImageElement).src = '/placeholder.svg';
-      (e.target as HTMLImageElement).style.opacity = '1';
-    }}
-  />
-```
-
-For person results - similar treatment for profile images.
-
-### 3. Use Stable Keys
-
-The current `key={item.id}` is already good, but we should ensure the same item doesn't remount by verifying IDs are stable TMDB IDs (which they are).
+---
 
 ## Files to Modify
 
 | File | Changes |
 |------|---------|
-| `src/hooks/useTMDB.ts` | Add `placeholderData: keepPreviousData` to `useTMDBSearch` and `useTMDBPersonSearch` |
-| `src/components/watch/SearchOverlay.tsx` | Add background placeholder, lazy loading, and fade-in transition to images |
+| `src/components/watch/SearchOverlay.tsx` | Reorganize layout: keyboard on left (40%), results grid on right (60%); update keyboard navigation for horizontal movement between zones |
+| `supabase/functions/tmdb/index.ts` | Add `search-tv` endpoint for TV-specific search |
+| `src/services/tmdbService.ts` | Add `searchTV` method to call the new endpoint |
+| `src/hooks/useTMDB.ts` | Update `useTMDBSearch` to fetch both multi and TV search, merge and deduplicate results |
 
-## Technical Details
+---
 
-**`keepPreviousData` behavior:**
-- When query changes (e.g., "bat" → "batm"), the previous results stay visible
-- New results smoothly replace old ones once fetched
-- No empty/loading flash between results
+## Navigation Changes
 
-**Image fade-in technique:**
-- Image starts with `opacity: 0`
-- `onLoad` sets `opacity: 1`
-- CSS `transition-opacity` creates smooth fade
-- Background placeholder shows while loading
+With the new side-by-side layout, keyboard navigation updates:
+
+- **ArrowRight from keyboard**: Jump to results
+- **ArrowLeft from results**: Jump back to keyboard
+- **ArrowUp/Down in keyboard**: Move through keyboard rows
+- **ArrowUp/Down in results**: Move through results grid
+
+---
 
 ## Expected Results
 
+### Layout
+- Keyboard stays visible on the left while browsing results
+- Can immediately click/select results without scrolling past keyboard
+- More efficient use of screen space
+
+### Search "White"
 **Before:**
-- Type "b" → results appear
-- Type "a" → results disappear, loading, reappear
-- Type "t" → results disappear, loading, reappear
-- Images flash and flicker on each keystroke
+- Random obscure movies with "White" in title
+- "The White Lotus" buried or missing
 
 **After:**
-- Type "b" → results appear
-- Type "a" → previous results stay visible, smoothly transition to new results
-- Type "t" → same smooth transition
-- Images fade in gracefully, no flicker
+- "The White Lotus" appears near the top (high popularity)
+- Better coverage of both movies AND TV shows matching the query
