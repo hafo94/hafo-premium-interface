@@ -222,18 +222,10 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
               : "none",
         }}
       >
-        {Icon ? (
+        {Icon && (
           <Icon
             className={cn("w-5 h-5 flex-shrink-0", isActive && `text-${color}`)}
             strokeWidth={1.5}
-          />
-        ) : isExpanded ? null : (
-          // Show a small dot for genre items when collapsed
-          <span
-            className={cn(
-              "w-1.5 h-1.5 rounded-full",
-              isActive ? `bg-${color}` : "bg-muted-foreground/40"
-            )}
           />
         )}
         {isExpanded && <span className="whitespace-nowrap">{item.label}</span>}
@@ -276,17 +268,23 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
     flatIndex++;
 
     if (item.children) {
-      for (const child of item.children) {
-        const childFlatIndex = flatIndex;
-        renderContent.push(
-          renderItem(
-            { id: child.id, label: child.label },
-            childFlatIndex,
-            undefined,
-            true
-          )
-        );
-        flatIndex++;
+      // Only render children when expanded
+      if (isExpanded) {
+        for (const child of item.children) {
+          const childFlatIndex = flatIndex;
+          renderContent.push(
+            renderItem(
+              { id: child.id, label: child.label },
+              childFlatIndex,
+              undefined,
+              true
+            )
+          );
+          flatIndex++;
+        }
+      } else {
+        // Skip children in flatIndex when collapsed
+        flatIndex += item.children.length;
       }
     }
   }
