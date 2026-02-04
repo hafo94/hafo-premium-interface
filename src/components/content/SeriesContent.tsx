@@ -3,70 +3,29 @@ import ContentRow from "@/components/watch/ContentRow";
 import ContentDetail from "@/components/watch/ContentDetail";
 import FeaturedHero from "@/components/watch/FeaturedHero";
 import SearchOverlay from "@/components/watch/SearchOverlay";
-import { watchContent, WatchContent } from "@/data/watchContent";
+import { WatchContent } from "@/data/watchContent";
 import { useMyList } from "@/hooks/useMyList";
 import { useFocus } from "@/contexts/FocusContext";
+import { useSeriesPageData } from "@/hooks/useTMDB";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface SeriesContentProps {
   activeSection: string;
 }
-
-// Series-specific categories
-const seriesCategories = [
-  {
-    id: "continue",
-    title: "Continue Watching",
-    filter: (items: WatchContent[]) => items.filter((i) => i.progress && i.progress > 0),
-  },
-  {
-    id: "trending",
-    title: "Trending Series",
-    filter: (items: WatchContent[]) => items.filter((i) => i.isHot),
-  },
-  {
-    id: "recommended",
-    title: "Recommended For You",
-    filter: (items: WatchContent[]) => items.filter((i) => i.isRecommended),
-  },
-  {
-    id: "drama",
-    title: "Drama Series",
-    filter: (items: WatchContent[]) => items.filter((i) => i.genre?.includes("Drama")),
-  },
-  {
-    id: "comedy",
-    title: "Comedy Series",
-    filter: (items: WatchContent[]) => items.filter((i) => i.genre?.includes("Comedy")),
-  },
-  {
-    id: "scifi",
-    title: "Sci-Fi & Fantasy",
-    filter: (items: WatchContent[]) =>
-      items.filter((i) => i.genre?.includes("Sci-Fi") || i.genre?.includes("Fantasy")),
-  },
-  {
-    id: "all-series",
-    title: "All Series",
-    filter: (items: WatchContent[]) => items,
-  },
-];
 
 const SeriesContent = ({ activeSection }: SeriesContentProps) => {
   const { myList, toggleInList, isInList } = useMyList();
   const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
 
-  // Filter to only series content
-  const seriesContent = useMemo(
-    () => watchContent.filter((item) => item.type === "series"),
-    []
-  );
+  // Fetch TMDB data
+  const { popularSeries, trendingSeries, topRatedSeries, onTheAir, isLoading, error } = useSeriesPageData();
 
-  // Featured content - rotate through hot/recommended series
-  const featuredItems = useMemo(
-    () => seriesContent.filter((item) => item.isHot || item.isRecommended),
-    [seriesContent]
-  );
+  // Featured content - use trending series for hero
+  const featuredItems = useMemo(() => {
+    return trendingSeries.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
+  }, [trendingSeries]);
+
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const featuredContent = featuredItems[featuredIndex] || featuredItems[0];
 
@@ -85,29 +44,29 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
 
   // Build categories including My List
   const visibleCategories = useMemo(() => {
-    const myListItems = seriesContent.filter((item) => myList.includes(item.id));
+    const allSeries = [...popularSeries, ...trendingSeries, ...topRatedSeries, ...onTheAir];
+    const myListItems = allSeries.filter((item) => myList.includes(item.id));
 
-    const allCategories = [
+    const categories = [
       ...(myListItems.length > 0
-        ? [
-            {
-              id: "my-list",
-              title: "My List",
-              items: myListItems,
-            },
-          ]
+        ? [{ id: "my-list", title: "My List", items: myListItems }]
         : []),
-      ...seriesCategories
-        .map((cat) => ({
-          id: cat.id,
-          title: cat.title,
-          items: cat.filter(seriesContent),
-        }))
-        .filter((cat) => cat.items.length > 0),
+      ...(trendingSeries.length > 0
+        ? [{ id: "trending", title: "Trending Now", items: trendingSeries }]
+        : []),
+      ...(popularSeries.length > 0
+        ? [{ id: "popular", title: "Popular Series", items: popularSeries }]
+        : []),
+      ...(topRatedSeries.length > 0
+        ? [{ id: "top-rated", title: "Top Rated", items: topRatedSeries }]
+        : []),
+      ...(onTheAir.length > 0
+        ? [{ id: "on-the-air", title: "Currently Airing", items: onTheAir }]
+        : []),
     ];
 
-    return allCategories;
-  }, [myList, seriesContent]);
+    return categories;
+  }, [myList, popularSeries, trendingSeries, topRatedSeries, onTheAir]);
 
   // Auto-rotate featured content
   useEffect(() => {
@@ -123,10 +82,8 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
     if (selectedContent || isSearchOpen || !isContentFocused) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Skip alt key combos (used by header)
       if (e.altKey) return;
 
-      // Open search with 's' key
       if (e.key === "s" || e.key === "S") {
         e.preventDefault();
         setIsSearchOpen(true);
@@ -135,11 +92,7 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
 
       const { row, col } = contentIndex;
 
-      // If hero is active (row === -1), let FeaturedHero handle left/right/enter
-      if (
-        row === -1 &&
-        (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter")
-      ) {
+      if (row === -1 && (e.key === "ArrowLeft" || e.key === "ArrowRight" || e.key === "Enter")) {
         return;
       }
 
@@ -153,10 +106,8 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
         case "ArrowUp":
           e.preventDefault();
           if (row === -1) {
-            // From hero, go directly to header
             focusHeader();
           } else if (row === 0) {
-            // From first row, go to hero
             setContentIndex({ row: -1, col: 0 });
           } else {
             setContentIndex({ row: row - 1, col });
@@ -175,13 +126,11 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
           e.preventDefault();
           if (row >= 0) {
             if (col === 0) {
-              // At first item, go to sidebar
               focusSidebar();
             } else {
               setContentIndex({ row, col: col - 1 });
             }
           } else {
-            // In hero, go to sidebar
             focusSidebar();
           }
           break;
@@ -210,11 +159,37 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
     [setActiveZone, setContentIndex]
   );
 
-  // Handle case where there's no series content
-  if (seriesContent.length === 0) {
+  // Loading skeleton
+  if (isLoading) {
+    return (
+      <div className="min-h-screen">
+        <div className="relative h-[70vh]">
+          <Skeleton className="w-full h-full" />
+        </div>
+        <div className="py-4 px-6 space-y-8">
+          {[1, 2, 3].map((row) => (
+            <div key={row} className="space-y-4">
+              <Skeleton className="h-8 w-48" />
+              <div className="flex gap-4">
+                {[1, 2, 3, 4, 5].map((item) => (
+                  <Skeleton key={item} className="w-[200px] h-[300px] rounded-lg" />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">No series content available</p>
+        <div className="text-center space-y-4">
+          <p className="text-destructive text-lg">Failed to load series</p>
+          <p className="text-muted-foreground text-sm">Please try again later</p>
+        </div>
       </div>
     );
   }
@@ -236,7 +211,7 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
       {/* Featured indicators */}
       {featuredItems.length > 1 && (
         <div className="relative z-10 flex items-center justify-center gap-2 -mt-20 mb-6">
-          {featuredItems.slice(0, 5).map((_, idx) => (
+          {featuredItems.map((_, idx) => (
             <button
               key={idx}
               onClick={() => setFeaturedIndex(idx)}
@@ -261,9 +236,7 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
             isActiveRow={isContentFocused && contentIndex.row === rowIndex}
             focusedItemIndex={contentIndex.row === rowIndex ? contentIndex.col : 0}
             onItemSelect={setSelectedContent}
-            onFocusChange={(itemIndex) =>
-              handleItemFocusChange(rowIndex, itemIndex)
-            }
+            onFocusChange={(itemIndex) => handleItemFocusChange(rowIndex, itemIndex)}
           />
         ))}
       </div>

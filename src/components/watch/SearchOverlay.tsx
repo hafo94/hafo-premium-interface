@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Search, Delete } from 'lucide-react';
+import { X, Search, Delete, Loader2 } from 'lucide-react';
 import { WatchContent, watchContent } from '@/data/watchContent';
+import { useTMDBSearch } from '@/hooks/useTMDB';
 import { cn } from '@/lib/utils';
 
 interface SearchOverlayProps {
@@ -20,13 +21,31 @@ type FocusArea = 'keyboard' | 'results' | 'close';
 
 const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedTerm, setDebouncedTerm] = useState('');
   const [focusArea, setFocusArea] = useState<FocusArea>('keyboard');
   const [keyboardPos, setKeyboardPos] = useState({ row: 0, col: 0 });
   const [resultIndex, setResultIndex] = useState(0);
   const resultsRef = useRef<HTMLDivElement>(null);
 
-  // Filter content based on search term
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Use TMDB search hook
+  const { data: tmdbResults, isLoading: isSearching } = useTMDBSearch(debouncedTerm);
+
+  // Filter content based on search term - fallback to local data if no TMDB results
   const filteredContent = useMemo(() => {
+    // If we have TMDB results, use those
+    if (tmdbResults && tmdbResults.length > 0) {
+      return tmdbResults;
+    }
+    
+    // Fallback to local content
     if (!searchTerm.trim()) return watchContent.slice(0, 12);
     const term = searchTerm.toLowerCase();
     return watchContent.filter(
@@ -35,12 +54,13 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
         item.genre.some((g) => g.toLowerCase().includes(term)) ||
         item.plot.toLowerCase().includes(term)
     );
-  }, [searchTerm]);
+  }, [searchTerm, tmdbResults]);
 
   // Reset state when overlay opens/closes
   useEffect(() => {
     if (isOpen) {
       setSearchTerm('');
+      setDebouncedTerm('');
       setFocusArea('keyboard');
       setKeyboardPos({ row: 1, col: 0 });
       setResultIndex(0);
@@ -184,7 +204,11 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
       <div className="h-full flex flex-col p-8 max-w-6xl mx-auto">
         {/* Header with search input */}
         <div className="flex items-center gap-4 mb-8">
-          <Search className="w-8 h-8 text-muted-foreground" />
+          {isSearching ? (
+            <Loader2 className="w-8 h-8 text-nipflix animate-spin" />
+          ) : (
+            <Search className="w-8 h-8 text-muted-foreground" />
+          )}
           <div className="flex-1 relative">
             <div className="text-3xl font-light text-foreground tracking-wide min-h-[48px] border-b-2 border-nipflix pb-2">
               {searchTerm || <span className="text-muted-foreground">Search titles, genres...</span>}
@@ -247,6 +271,7 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
             <>
               <h3 className="text-lg text-muted-foreground mb-4">
                 {searchTerm ? `Results for "${searchTerm}"` : 'Popular Titles'}
+                {isSearching && <span className="ml-2 text-nipflix">(searching...)</span>}
               </h3>
               <div className="grid grid-cols-3 gap-4">
                 {filteredContent.map((item, idx) => {
@@ -268,9 +293,12 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
                       )}
                     >
                       <img
-                        src={item.poster}
+                        src={item.backdrop || item.poster}
                         alt={item.title}
                         className="w-full h-full object-cover"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).src = '/placeholder.svg';
+                        }}
                       />
                       <div
                         className={cn(
@@ -282,6 +310,7 @@ const SearchOverlay = ({ isOpen, onClose, onSelect }: SearchOverlayProps) => {
                         <p className="text-sm font-semibold text-foreground">{item.title}</p>
                         <p className="text-xs text-muted-foreground">
                           {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
+                          {item.rating && ` • ⭐ ${item.rating}`}
                         </p>
                       </div>
                     </button>
