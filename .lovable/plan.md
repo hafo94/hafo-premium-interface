@@ -1,138 +1,124 @@
 
-# TV Player Fullscreen UI Improvements
+# Premium Header Navigation Redesign
 
 ## Overview
-Enhance the TV Player with proper fullscreen controls including a visible back button, play/pause functionality, and fix various UI issues to create a polished viewing experience.
+Redesign the mode navigation header to have a centered, seamless, high-end aesthetic. Replace the pill-button style with an elegant underline/indicator-based navigation that feels more integrated into the header bar, similar to premium streaming services like Apple TV+ or HBO Max.
 
-## Current Issues Found
+## Current vs New Design
 
-| Issue | Description |
-|-------|-------------|
-| No back button | ESC key works but no visible back arrow in top-left |
-| No play/pause | Essential control is completely missing |
-| Settings button broken | Has no onClick handler |
-| Progress bar unstable | Random value changes on every render |
-| No channel prev/next | Only full channel list via ArrowUp |
-| EPG won't open | Callback is empty in TVContent |
-| No volume slider | Only mute toggle exists |
+**Current Design:**
+- Mode tabs on the left in a glass pill container
+- Rounded pill buttons with background fills
+- Time/logo on the right
+- Feels like separate "buttons" rather than integrated navigation
 
-## Proposed Changes
-
-### 1. Add Top-Left Back Button
-- Add a back arrow button in the top-left corner
-- Shows on overlay visible, matches the overlay fade animation
-- Uses `ArrowLeft` or custom back icon
-- Clickable for mouse/remote users
-
-### 2. Add Play/Pause Control
-- Add large center play/pause button (appears briefly on tap/click)
-- Add play/pause in bottom control bar
-- Toggle with Space key
-- State: `isPaused` boolean
-
-### 3. Add Channel Navigation
-- Previous/Next channel buttons in the control bar
-- Channel Up/Down with dedicated buttons
-- Keyboard shortcuts: Page Up / Page Down for quick channel switch
-
-### 4. Fix Settings Button
-- Connect to a settings panel or quality selector
-- Options: Video quality, Closed captions, Audio track
-
-### 5. Fix Progress Bar
-- Calculate progress based on program start/end time
-- Use `useMemo` or `useState` to prevent re-renders
-- Show actual program progress percentage
-
-### 6. Enable EPG Opening
-- Fix the empty callback in TVContent
-- Pass proper `setShowEPG` state handler
-
-### 7. Add Fullscreen Toggle
-- Button in control bar to toggle browser fullscreen
-- Use `document.fullscreenElement` API
-
-## File Changes
-
-### `src/components/tv/TVPlayer.tsx`
-- Add back arrow button (top-left, visible with overlay)
-- Add play/pause state and controls
-- Add channel prev/next navigation
-- Add fullscreen toggle
-- Fix progress bar to use stable calculation
-- Add more keyboard shortcuts (Space, Page Up/Down)
-- Connect settings button to quality panel
-
-### `src/components/content/TVContent.tsx`
-- Fix EPG callback to properly open EPG grid
-- Add state for EPG visibility
-
-## New UI Layout
-
+**New Design:**
 ```text
-+--------------------------------------------------+
-|  [<- Back]                    [CH 1] LIVE (mini) |
-|                                                  |
-|                                                  |
-|                   [PLAY/PAUSE]                   |
-|                   (center tap)                   |
-|                                                  |
-|                                                  |
-+--------------------------------------------------+
-| [Progress Bar ============================----] |
-|                                                  |
-| 1 [SVT1] SVT1                                    |
-|   * LIVE   Aktuellt                              |
-|   20:00 - 20:30  |  News Program                 |
-|                                                  |
-| [<CH] [CH>]  [Mute] [Settings] [Fullscreen]      |
-|                                                  |
-| ^ Channels  v Guide  SPACE Play/Pause  ESC Exit  |
-+--------------------------------------------------+
++------------------------------------------------------------------+
+|                                                                  |
+|  hafo           Movies    TV    Games              12:30         |
+|                   ═══                              Tue, Feb 4     |
+|                                                                  |
++------------------------------------------------------------------+
 ```
 
-## Keyboard Shortcuts (Updated)
-- **ESC / Backspace**: Exit player, go back
-- **Space**: Play/Pause toggle
-- **M**: Mute/Unmute
-- **Arrow Up**: Open channel list
-- **Arrow Down**: Open EPG guide
-- **Page Up**: Previous channel
-- **Page Down**: Next channel
-- **F**: Toggle fullscreen
-- **Left/Right**: Seek (future, for VOD)
+- Logo anchored on the left as brand identity
+- Navigation tabs centered with elegant typography
+- Active state uses a subtle underline/indicator instead of background pills
+- Time/date on the right (subtle, secondary)
+- Clean horizontal layout with proper spacing
 
-## Technical Notes
+## Visual Style
 
-### Progress Calculation
+### Tab Design
+- No background containers or pills
+- Text-only with generous letter-spacing
+- Active tab: Accent color text + animated underline indicator
+- Inactive tabs: Muted gray text with hover brightening
+- Smooth sliding underline animation when switching tabs
+
+### Typography
+- Slightly larger, lighter font weight for elegance
+- Tracking (letter-spacing) for premium feel
+- Icons optional - can be removed for cleaner look or kept very subtle
+
+### Underline Indicator
+- Thin line (2px) positioned below the active tab text
+- Animated to slide between tabs on change
+- Uses mode-specific accent color with subtle glow
+- Smooth spring-like transition (300ms ease-out)
+
+## Technical Implementation
+
+### File: `src/components/ModeHeader.tsx`
+
+**Layout Changes:**
+- Three-column grid layout: Logo | Center Nav | Time
+- Use `justify-center` for the middle section
+- Remove glass container around tabs
+
+**Styling Changes:**
+- Remove `rounded-full glass` container
+- Remove `rounded-full` and background from individual buttons
+- Add underline indicator with absolute positioning
+- Use CSS transform to animate indicator position
+
+**Indicator Animation:**
 ```typescript
-const getProgress = () => {
-  const now = new Date();
-  const [startH, startM] = channel.currentProgram.startTime.split(':').map(Number);
-  const [endH, endM] = channel.currentProgram.endTime.split(':').map(Number);
-  
-  const start = startH * 60 + startM;
-  const end = endH * 60 + endM;
-  const current = now.getHours() * 60 + now.getMinutes();
-  
-  return Math.min(100, Math.max(0, ((current - start) / (end - start)) * 100));
+// Calculate indicator position based on active tab
+const indicatorStyle = {
+  transform: `translateX(${activeIndex * tabWidth}px)`,
+  width: `${activeTabWidth}px`,
 };
 ```
 
-### Fullscreen API
-```typescript
-const toggleFullscreen = () => {
-  if (document.fullscreenElement) {
-    document.exitFullscreen();
-  } else {
-    document.documentElement.requestFullscreen();
-  }
-};
+### Updated Structure
+```jsx
+<header className="relative flex items-center justify-between px-8 py-5 z-50">
+  {/* Left: Logo */}
+  <h1 className="text-xl font-light tracking-[0.35em] text-gradient">
+    hafo
+  </h1>
+
+  {/* Center: Navigation */}
+  <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-8">
+    {modes.map((mode) => (
+      <button className="relative text-sm tracking-wider uppercase ...">
+        {mode.label}
+      </button>
+    ))}
+    {/* Animated underline indicator */}
+    <span className="absolute bottom-0 h-0.5 bg-current transition-all ..." />
+  </nav>
+
+  {/* Right: Time */}
+  <div className="text-right ...">
+    ...
+  </div>
+</header>
 ```
 
-## Visual Design
-- Back button: Semi-transparent pill with arrow icon
-- Play/Pause: Large centered button (like YouTube)
-- Channel buttons: Match existing control button style
-- All buttons have hover states and focus rings for TV navigation
-- Consistent with the premium dark glassmorphism theme
+## Design Details
+
+| Element | Current | New |
+|---------|---------|-----|
+| Container | Glass pill | No container (transparent) |
+| Tab buttons | Rounded pills with bg | Text-only, no background |
+| Active indicator | Background fill + glow | Underline bar + subtle glow |
+| Icons | Visible with labels | Hidden or very subtle |
+| Layout | Left-aligned tabs | Centered tabs |
+| Logo position | Right side | Left side (brand anchor) |
+| Spacing | Compact | More generous padding |
+
+## Animation & Transitions
+- Underline slides smoothly between tabs (transform)
+- Text color fades on hover (opacity/color transition)
+- Active tab gets subtle text glow matching accent color
+- 300ms duration with ease-out easing for premium feel
+
+## Files to Modify
+1. `src/components/ModeHeader.tsx` - Complete redesign of layout and styling
+
+## Keyboard Navigation
+- Existing Alt + Arrow Left/Right shortcuts preserved
+- Focus states updated to match new design (no ring, just color change)
