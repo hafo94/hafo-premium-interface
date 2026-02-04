@@ -1,124 +1,199 @@
 
-# Premium Header Navigation Redesign
+
+# Full Arrow Key & TV Remote Navigation
 
 ## Overview
-Redesign the mode navigation header to have a centered, seamless, high-end aesthetic. Replace the pill-button style with an elegant underline/indicator-based navigation that feels more integrated into the header bar, similar to premium streaming services like Apple TV+ or HBO Max.
+Create a unified, TV-first navigation system that allows the entire app to be controlled with arrow keys and Enter - perfect for TV remotes on your Raspberry Pi. The system will manage focus across all UI zones (header, sidebar, content) seamlessly.
 
-## Current vs New Design
+## Current State Analysis
 
-**Current Design:**
-- Mode tabs on the left in a glass pill container
-- Rounded pill buttons with background fills
-- Time/logo on the right
-- Feels like separate "buttons" rather than integrated navigation
+| Component | Arrow Key Support | Status |
+|-----------|------------------|--------|
+| ModeHeader | Alt + Left/Right only | Partial (needs Alt) |
+| ModeSidebar | Up/Down + Enter | Working |
+| MoviesContent | Full grid navigation | Working |
+| TVContent | No arrow navigation | Missing |
+| GamesContent | No keyboard support | Missing |
+| TVPlayer | Full keyboard support | Working |
 
-**New Design:**
+**The core issue**: Each component handles its own keyboard events independently, leading to conflicts. We need a unified focus manager.
+
+## Solution Architecture
+
 ```text
-+------------------------------------------------------------------+
-|                                                                  |
-|  hafo           Movies    TV    Games              12:30         |
-|                   ═══                              Tue, Feb 4     |
-|                                                                  |
-+------------------------------------------------------------------+
+┌─────────────────────────────────────────────────────────────┐
+│                      Focus Manager (Context)                 │
+│                                                             │
+│   Tracks: activeZone = 'header' | 'sidebar' | 'content'    │
+│                                                             │
+│   Rules:                                                    │
+│   • ArrowUp from content row 0 → focus sidebar/header       │
+│   • ArrowLeft from sidebar → stay (wrap)                    │
+│   • ArrowRight from sidebar → focus content                 │
+│   • Enter anywhere → activate focused item                  │
+│   • Escape → go back one level                             │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        ▼                     ▼                     ▼
+   ┌─────────┐          ┌──────────┐          ┌─────────┐
+   │ Header  │◄─────────│ Sidebar  │◄─────────│ Content │
+   │  tabs   │          │  items   │          │  grid   │
+   └─────────┘          └──────────┘          └─────────┘
+        │                     │                     │
+        └─────────────────────┼─────────────────────┘
+                              │
+                     Left/Right switches
+                     between header tabs
 ```
 
-- Logo anchored on the left as brand identity
-- Navigation tabs centered with elegant typography
-- Active state uses a subtle underline/indicator instead of background pills
-- Time/date on the right (subtle, secondary)
-- Clean horizontal layout with proper spacing
+## Implementation Plan
 
-## Visual Style
+### 1. Create Focus Manager Context
+New file: `src/contexts/FocusContext.tsx`
 
-### Tab Design
-- No background containers or pills
-- Text-only with generous letter-spacing
-- Active tab: Accent color text + animated underline indicator
-- Inactive tabs: Muted gray text with hover brightening
-- Smooth sliding underline animation when switching tabs
+- Create a context to track which zone is currently focused: `header` | `sidebar` | `content`
+- Track focused indices within each zone
+- Provide methods to move focus between zones
+- Remember last focused item when returning to a zone
 
-### Typography
-- Slightly larger, lighter font weight for elegance
-- Tracking (letter-spacing) for premium feel
-- Icons optional - can be removed for cleaner look or kept very subtle
+### 2. Update Header Navigation
+Modify: `src/components/ModeHeader.tsx`
 
-### Underline Indicator
-- Thin line (2px) positioned below the active tab text
-- Animated to slide between tabs on change
-- Uses mode-specific accent color with subtle glow
-- Smooth spring-like transition (300ms ease-out)
+- Remove Alt key requirement (plain Left/Right when header is focused)
+- Accept focus from FocusContext
+- Add visual focus indicator (subtle glow/ring) on focused tab
+- Arrow Down → move focus to sidebar or content
+- Left/Right → switch tabs directly
 
-## Technical Implementation
+### 3. Update Sidebar Navigation  
+Modify: `src/components/ModeSidebar.tsx`
 
-### File: `src/components/ModeHeader.tsx`
+- Already has Up/Down/Enter - keep this working
+- Add: Arrow Right → focus content area
+- Add: Arrow Up from top item → focus header
+- Show clear focus state (already has this)
 
-**Layout Changes:**
-- Three-column grid layout: Logo | Center Nav | Time
-- Use `justify-center` for the middle section
-- Remove glass container around tabs
+### 4. Add TV Content Navigation
+Modify: `src/components/content/TVContent.tsx`
 
-**Styling Changes:**
-- Remove `rounded-full glass` container
-- Remove `rounded-full` and background from individual buttons
-- Add underline indicator with absolute positioning
-- Use CSS transform to animate indicator position
+- Add grid navigation for channel cards (Left/Right/Up/Down)
+- Track focused channel index
+- Enter → select channel and open player
+- Arrow Left at first column → focus sidebar
+- Arrow Up at top row → focus sidebar
 
-**Indicator Animation:**
+### 5. Add Games Content Navigation
+Modify: `src/components/content/GamesContent.tsx`
+
+- Simple Up/Down between two buttons (Retro/Steam)
+- Enter → navigate to selected page
+- Left → focus header (no sidebar in games mode)
+- Show focus ring on selected button
+
+### 6. Update UnifiedHome with Focus Provider
+Modify: `src/components/UnifiedHome.tsx`
+
+- Wrap app with FocusProvider
+- Pass focus state to child components
+- Handle global navigation between zones
+
+## Keyboard Mapping (TV Remote Compatible)
+
+| Key | Action |
+|-----|--------|
+| ← → | Navigate horizontally / Switch header tabs |
+| ↑ ↓ | Navigate vertically / Move between zones |
+| Enter | Select / Activate focused item |
+| Escape | Go back / Close overlay |
+| Backspace | Go back (alternative to Escape) |
+
+**TV Remote Mapping** (most remotes send these keys):
+- D-pad → Arrow keys
+- OK/Select → Enter
+- Back → Escape or Backspace
+- Menu → Could open settings overlay
+
+## Visual Focus Indicators
+
+All focusable elements will have clear visual states:
+
+1. **Header tabs**: Underline + glow when focused (not just when active)
+2. **Sidebar items**: Background highlight + left border when focused
+3. **Channel cards**: Ring + scale up when focused
+4. **Game buttons**: Ring + glow when focused
+5. **Content tiles**: Ring + scale up (already exists in Movies)
+
+## Technical Details
+
+### Focus Flow Logic
 ```typescript
-// Calculate indicator position based on active tab
-const indicatorStyle = {
-  transform: `translateX(${activeIndex * tabWidth}px)`,
-  width: `${activeTabWidth}px`,
-};
+// When ArrowRight is pressed in sidebar:
+if (activeZone === 'sidebar') {
+  setActiveZone('content');
+  // Content remembers its last focused item
+}
+
+// When ArrowUp is pressed at top of content:
+if (activeZone === 'content' && focusedRow === 0) {
+  setActiveZone('sidebar');
+}
+
+// When ArrowUp is pressed at top of sidebar:
+if (activeZone === 'sidebar' && focusedIndex === 0) {
+  setActiveZone('header');
+}
 ```
 
-### Updated Structure
-```jsx
-<header className="relative flex items-center justify-between px-8 py-5 z-50">
-  {/* Left: Logo */}
-  <h1 className="text-xl font-light tracking-[0.35em] text-gradient">
-    hafo
-  </h1>
+### Auto-Focus on Load
+- On app load: Focus starts on first content item (most common use case)
+- After mode change: Focus moves to first content item in new mode
+- After closing overlay: Focus returns to previously focused item
 
-  {/* Center: Navigation */}
-  <nav className="absolute left-1/2 -translate-x-1/2 flex items-center gap-8">
-    {modes.map((mode) => (
-      <button className="relative text-sm tracking-wider uppercase ...">
-        {mode.label}
-      </button>
-    ))}
-    {/* Animated underline indicator */}
-    <span className="absolute bottom-0 h-0.5 bg-current transition-all ..." />
-  </nav>
-
-  {/* Right: Time */}
-  <div className="text-right ...">
-    ...
-  </div>
-</header>
-```
-
-## Design Details
-
-| Element | Current | New |
-|---------|---------|-----|
-| Container | Glass pill | No container (transparent) |
-| Tab buttons | Rounded pills with bg | Text-only, no background |
-| Active indicator | Background fill + glow | Underline bar + subtle glow |
-| Icons | Visible with labels | Hidden or very subtle |
-| Layout | Left-aligned tabs | Centered tabs |
-| Logo position | Right side | Left side (brand anchor) |
-| Spacing | Compact | More generous padding |
-
-## Animation & Transitions
-- Underline slides smoothly between tabs (transform)
-- Text color fades on hover (opacity/color transition)
-- Active tab gets subtle text glow matching accent color
-- 300ms duration with ease-out easing for premium feel
+## Files to Create
+1. `src/contexts/FocusContext.tsx` - Focus management context
 
 ## Files to Modify
-1. `src/components/ModeHeader.tsx` - Complete redesign of layout and styling
+1. `src/components/UnifiedHome.tsx` - Add FocusProvider wrapper
+2. `src/components/ModeHeader.tsx` - Zone-aware focus, remove Alt requirement
+3. `src/components/ModeSidebar.tsx` - Add Right arrow to content, Up to header
+4. `src/components/content/TVContent.tsx` - Add full grid navigation
+5. `src/components/content/GamesContent.tsx` - Add Up/Down between buttons
+6. `src/components/tv/ChannelCard.tsx` - Add focus prop styling
 
-## Keyboard Navigation
-- Existing Alt + Arrow Left/Right shortcuts preserved
-- Focus states updated to match new design (no ring, just color change)
+## Navigation Diagram
+
+```text
+Games Mode (no sidebar):
+┌──────────────────────────────────────┐
+│         [Movies] [TV] [Games]        │  ← Left/Right
+│              ↑                       │
+│              ↓                       │
+│    ┌──────────────────────────┐     │
+│    │   [ Retro Games ]        │     │  ← Up/Down
+│    │   [ Steam Link  ]        │     │
+│    └──────────────────────────┘     │
+└──────────────────────────────────────┘
+
+Movies/TV Mode (with sidebar):
+┌──────────────────────────────────────┐
+│         [Movies] [TV] [Games]        │  ← Left/Right
+│              ↑                       │
+│    ↓─────────┴───────────↓          │
+│  ┌──────┐    ┌───────────────────┐  │
+│  │Search│ →  │ Content Grid      │  │
+│  │Home  │ ←  │ [1][2][3][4][5]   │  │
+│  │...   │    │ [A][B][C][D][E]   │  │
+│  └──────┘    └───────────────────┘  │
+│     ↑↓            ↑↓ ←→             │
+└──────────────────────────────────────┘
+```
+
+## Testing Considerations
+- Test with physical TV remote via Raspberry Pi
+- Ensure focus is always visible (never lost)
+- Test rapid key presses (debouncing if needed)
+- Test all mode transitions
+- Test overlay open/close focus restoration
+
