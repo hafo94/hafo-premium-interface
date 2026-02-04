@@ -49,11 +49,17 @@ const ContentGrid = ({
 }: ContentGridProps) => {
   const gridRef = useRef<HTMLDivElement>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const prevFocusIndex = useRef(focusedIndex);
   const columns = useGridColumns();
 
-  // Scroll focused item into view
+  // Scroll focused item into view - only when focus actually changes
   useEffect(() => {
     if (!isActive || focusedIndex < 0) return;
+    
+    // Only scroll if focusedIndex actually changed (not just a re-render)
+    if (prevFocusIndex.current === focusedIndex) return;
+    prevFocusIndex.current = focusedIndex;
+    
     const grid = gridRef.current;
     if (!grid) return;
 
