@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFocus } from "@/contexts/FocusContext";
+import SettingsModal from "@/components/SettingsModal";
 
 export type AppMode = "movies" | "series" | "tv" | "games";
 
@@ -19,6 +21,7 @@ const modes = [
 const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
   const { activeZone, headerIndex, setHeaderIndex, focusSidebar, focusContent, setActiveZone } = useFocus();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0 });
   const navRef = useRef<HTMLDivElement>(null);
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
@@ -194,15 +197,26 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
         />
       </nav>
 
-      {/* Right: Time/Date */}
-      <div className="text-right hidden sm:block">
-        <div className="text-base font-light tracking-wide text-foreground/60 tabular-nums">
-          {formatTime(currentTime)}
-        </div>
-        <div className="text-xs font-light text-foreground/35 tracking-wider">
-          {formatDate(currentTime)}
+      {/* Right: Settings + Time/Date */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={() => setSettingsOpen(true)}
+          className="text-foreground/40 hover:text-foreground/70 transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30 rounded-lg p-1.5"
+          aria-label="Settings"
+        >
+          <Settings className="w-5 h-5" strokeWidth={1.5} />
+        </button>
+        <div className="text-right hidden sm:block">
+          <div className="text-base font-light tracking-wide text-foreground/60 tabular-nums">
+            {formatTime(currentTime)}
+          </div>
+          <div className="text-xs font-light text-foreground/35 tracking-wider">
+            {formatDate(currentTime)}
+          </div>
         </div>
       </div>
+
+      <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
     </header>
   );
 };
