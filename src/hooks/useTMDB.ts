@@ -307,26 +307,58 @@ export const usePersonCredits = (personId: number | undefined) => {
       if (!personId) throw new Error("Person ID required");
       const response: TMDBPersonCredits = await tmdbService.getPersonCredits(personId);
       
-      // Transform and deduplicate credits
-      const allCredits = [...response.cast, ...response.crew];
-      const seen = new Set<number>();
-      const uniqueCredits: WatchContent[] = [];
+      // Build a map keyed by ID to deduplicate, preferring cast over crew
+      const creditMap = new Map<number, WatchContent>();
       
-      for (const credit of allCredits) {
-        if (seen.has(credit.id)) continue;
-        seen.add(credit.id);
-        
-        // Determine if it's a movie or series
+      // Process cast first (these take priority)
+      for (const credit of response.cast) {
+        if (creditMap.has(credit.id)) continue;
         const isMovie = credit.media_type === "movie" || "title" in credit;
-        if (isMovie) {
-          uniqueCredits.push(transformTMDBMovie(credit as any));
-        } else {
-          uniqueCredits.push(transformTMDBSeries(credit as any));
-        }
+        const transformed = isMovie
+          ? transformTMDBMovie(credit as any)
+          : transformTMDBSeries(credit as any);
+        
+        // Skip items without a poster
+        if (!credit.poster_path) continue;
+        
+        transformed.creditRole = "Actor";
+        transformed.popularity = credit.popularity || 0;
+        creditMap.set(credit.id, transformed);
       }
       
-      // Sort by popularity
-      return uniqueCredits.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      // Process crew (only add if not already seen as cast)
+      for (const credit of response.crew) {
+        if (creditMap.has(credit.id)) continue;
+        const isMovie = credit.media_type === "movie" || "title" in credit;
+        const transformed = isMovie
+          ? transformTMDBMovie(credit as any)
+          : transformTMDBSeries(credit as any);
+        
+        if (!credit.poster_path) continue;
+        
+        transformed.creditRole = (credit as any).job || "Crew";
+        transformed.popularity = credit.popularity || 0;
+        creditMap.set(credit.id, transformed);
+      }
+      
+      const uniqueCredits = Array.from(creditMap.values());
+      
+      // Sort: rated items first (by rating desc), then unrated (by popularity desc)
+      return uniqueCredits.sort((a, b) => {
+        const aRating = a.rating || 0;
+        const bRating = b.rating || 0;
+        const aHasRating = aRating > 0;
+        const bHasRating = bRating > 0;
+
+        if (aHasRating && !bHasRating) return -1;
+        if (!aHasRating && bHasRating) return 1;
+
+        if (aHasRating && bHasRating) {
+          if (bRating !== aRating) return bRating - aRating;
+        }
+
+        return (b.popularity || 0) - (a.popularity || 0);
+      });
     },
     enabled: !!personId,
     staleTime: STALE_TIME,

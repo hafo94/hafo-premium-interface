@@ -39,6 +39,9 @@ export interface WatchContent {
   iptvId?: number;           // Xtream stream_id
   streamUrl?: string;        // Direct stream URL
   containerExtension?: string; // mkv, mp4, etc.
+  // Credit-specific fields
+  creditRole?: string;         // e.g. "Actor", "Director", "Producer"
+  popularity?: number;         // TMDB popularity score
 }
 
 export const genres = [
