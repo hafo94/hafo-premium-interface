@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
+const CACHE_MAX_AGE_DAYS = 7;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,13 +22,131 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
-  
-  // Log key info for debugging (only first/last chars)
-  console.log(`TMDB key length: ${TMDB_API_KEY.length}, starts with: ${TMDB_API_KEY.substring(0, 4)}, ends with: ${TMDB_API_KEY.substring(TMDB_API_KEY.length - 4)}`);
 
   try {
     const url = new URL(req.url);
     const endpoint = url.searchParams.get("endpoint");
+
+    // Handle batch-imdb-ratings POST endpoint
+    if (endpoint === "batch-imdb-ratings" && req.method === "POST") {
+      const OMDB_API_KEY = Deno.env.get("OMDB_API_KEY");
+      if (!OMDB_API_KEY) {
+        return new Response(
+          JSON.stringify({ error: "OMDB_API_KEY not configured" }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+      const body = await req.json();
+      const items: { tmdb_id: number; media_type: string }[] = (body.items || []).slice(0, 20);
+
+      if (items.length === 0) {
+        return new Response(
+          JSON.stringify({ ratings: {} }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const tmdbIds = items.map(i => i.tmdb_id);
+      const cutoff = new Date(Date.now() - CACHE_MAX_AGE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+
+      // 1. Check cache
+      const { data: cached } = await supabase
+        .from("imdb_ratings_cache")
+        .select("*")
+        .in("tmdb_id", tmdbIds)
+        .gte("cached_at", cutoff);
+
+      const cachedMap = new Map<string, any>();
+      for (const row of (cached || [])) {
+        cachedMap.set(`${row.tmdb_id}-${row.media_type}`, row);
+      }
+
+      const ratings: Record<number, { imdbRating: number | null; imdbId: string | null }> = {};
+
+      // Populate from cache hits
+      for (const row of (cached || [])) {
+        ratings[row.tmdb_id] = {
+          imdbRating: row.imdb_rating ? parseFloat(row.imdb_rating) : null,
+          imdbId: row.imdb_id,
+        };
+      }
+
+      // 2. Process cache misses
+      const misses = items.filter(i => !cachedMap.has(`${i.tmdb_id}-${i.media_type}`));
+
+      for (const item of misses) {
+        try {
+          // Get TMDB detail to find imdb_id
+          let imdbId: string | null = null;
+          if (item.media_type === "movie") {
+            const tmdbRes = await fetch(
+              `${TMDB_BASE_URL}/movie/${item.tmdb_id}?api_key=${TMDB_API_KEY}`
+            );
+            if (tmdbRes.ok) {
+              const detail = await tmdbRes.json();
+              imdbId = detail.imdb_id || null;
+            } else {
+              await tmdbRes.text(); // consume body
+            }
+          } else {
+            const tmdbRes = await fetch(
+              `${TMDB_BASE_URL}/tv/${item.tmdb_id}/external_ids?api_key=${TMDB_API_KEY}`
+            );
+            if (tmdbRes.ok) {
+              const detail = await tmdbRes.json();
+              imdbId = detail.imdb_id || null;
+            } else {
+              await tmdbRes.text();
+            }
+          }
+
+          let imdbRating: number | null = null;
+          let imdbVotes: string | null = null;
+
+          if (imdbId) {
+            const omdbRes = await fetch(
+              `http://www.omdbapi.com/?i=${imdbId}&apikey=${OMDB_API_KEY}`
+            );
+            if (omdbRes.ok) {
+              const omdb = await omdbRes.json();
+              const parsed = parseFloat(omdb.imdbRating);
+              if (!isNaN(parsed)) {
+                imdbRating = parsed;
+                imdbVotes = omdb.imdbVotes || null;
+              }
+            } else {
+              await omdbRes.text();
+            }
+          }
+
+          // Store in cache (upsert)
+          await supabase.from("imdb_ratings_cache").upsert({
+            tmdb_id: item.tmdb_id,
+            media_type: item.media_type,
+            imdb_id: imdbId,
+            imdb_rating: imdbRating,
+            imdb_votes: imdbVotes,
+            cached_at: new Date().toISOString(),
+          });
+
+          ratings[item.tmdb_id] = { imdbRating, imdbId };
+        } catch (e) {
+          console.error(`Failed to fetch IMDb rating for ${item.tmdb_id}:`, e);
+          ratings[item.tmdb_id] = { imdbRating: null, imdbId: null };
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ ratings }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const page = url.searchParams.get("page") || "1";
     const query = url.searchParams.get("query") || "";
     const id = url.searchParams.get("id");

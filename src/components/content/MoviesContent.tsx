@@ -8,6 +8,7 @@ import { WatchContent } from "@/data/watchContent";
 import { useMyList } from "@/hooks/useMyList";
 import { useFocus } from "@/contexts/FocusContext";
 import { useMoviesPageData } from "@/hooks/useTMDB";
+import { useIMDBSortedContent, selectFeaturedItems } from "@/hooks/useIMDBRatings";
 import { useInfinitePopularMovies, useInfiniteNowPlayingMovies, useInfiniteMoviesByGenre } from "@/hooks/useInfiniteContent";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMovieGenreLabel } from "@/data/genreConfig";
@@ -28,7 +29,13 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   const isGridView = activeSection === "popular" || activeSection === "cinema" || isGenreSelected;
 
   // Fetch TMDB data for home view
-  const { trendingMovies, isLoading: homeLoading, error: homeError, popularMovies, topRatedMovies, nowPlaying } = useMoviesPageData();
+  const { trendingMovies: rawTrending, isLoading: homeLoading, error: homeError, popularMovies: rawPopular, topRatedMovies: rawTopRated, nowPlaying: rawNowPlaying } = useMoviesPageData();
+
+  // Sort each row by IMDb ratings
+  const trendingMovies = useIMDBSortedContent(rawTrending, "trending-movies");
+  const popularMovies = useIMDBSortedContent(rawPopular, "popular-movies");
+  const topRatedMovies = useIMDBSortedContent(rawTopRated, "top-rated-movies");
+  const nowPlaying = useIMDBSortedContent(rawNowPlaying, "now-playing-movies");
 
   // Infinite queries for grid views
   const { 
@@ -86,12 +93,12 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   // Grid focus index (flat index for 2D navigation)
   const [gridFocusIndex, setGridFocusIndex] = useState(0);
 
-  // Featured content - use trending movies for hero
+  // Featured content - prefer high IMDb-rated titles
   const featuredItems = useMemo(() => {
     if (isGridView && gridItems.length > 0) {
-      return gridItems.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
+      return selectFeaturedItems(gridItems, 5);
     }
-    return trendingMovies.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
+    return selectFeaturedItems(trendingMovies, 5);
   }, [trendingMovies, gridItems, isGridView]);
 
   const [featuredIndex, setFeaturedIndex] = useState(0);
