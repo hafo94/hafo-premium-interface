@@ -1,69 +1,105 @@
 
 
-# Optimize TMDB Image Sizes for Faster Loading
+# Faster Search Results & Image Loading Optimizations
 
-## Problem
+## Problems Found
 
-Currently, every image pulled from TMDB uses the same large sizes regardless of where it's displayed:
-- **Posters**: Always `w500` (~750KB each) -- even for small 200px thumbnails
-- **Backdrops**: Always `original` (~2-5MB each) -- even when used as small backgrounds
+1. **Search result thumbnails use backdrop images (w1280)** -- these are ~200KB+ each, far too large for small search cards
+2. **No skeleton placeholders** while images load -- users see empty space or nothing
+3. **Content row thumbnails lack `loading="lazy"`** -- all images load at once even if off-screen
+4. **No blur-up / low-quality placeholder** -- images pop in abruptly
 
-This causes unnecessary bandwidth usage and slower load times, especially when scrolling through grids with 20-60+ items.
+## Optimizations
 
-## Solution
+### 1. Smaller images for search results
+- Search content results currently use `item.backdrop` (w1280) as the thumbnail
+- Switch to `item.backdrop` at a **new smaller size** by adding a `backdropSmall` field using TMDB's `w300` size (~10-20KB vs ~200KB)
+- For person profile images, `w185` is already appropriate
 
-Introduce multiple image size options in the transformer and use appropriately sized images throughout the app. Small thumbnails get small images; only hero/detail views get large ones.
+### 2. Skeleton placeholders (shimmer effect)
+- Show a pulsing skeleton placeholder in the exact aspect ratio of each image while it loads
+- As soon as the image loads, cross-fade it in over the skeleton
+- This gives **instant visual feedback** -- users see the grid layout immediately with shimmering cards
 
-## TMDB Available Sizes
+### 3. Lazy loading everywhere
+- Add `loading="lazy"` to ContentRow thumbnails (currently missing)
+- Already present in ContentGrid -- no change needed there
 
-| Type | Options |
-|------|---------|
-| Poster | w92, w154, w185, w342, w500, w780 |
-| Backdrop | w300, w780, w1280, original |
+### 4. CSS blur-up technique
+- Start images with a slight blur and scale, then animate to sharp on load
+- Combined with the skeleton, this creates a smooth "materializing" effect
 
-## Recommended Size Mapping
+### 5. Keep previous search results visible (already done via React Query)
+- React Query's `keepPreviousData` behavior already prevents flickering between searches -- no change needed
 
-| Usage | Current | Proposed | Approx Savings |
-|-------|---------|----------|----------------|
-| Grid/row thumbnails (poster) | w500 | w342 | ~40% smaller |
-| Search result thumbnails | w500 | w185 | ~70% smaller |
-| Detail view poster | w500 | w500 | No change |
-| Hero backdrop | original | w1280 | ~60% smaller |
-| Row/grid backdrop (if used) | original | w780 | ~70% smaller |
+## Technical Details
 
-## Changes
+### Files to modify
 
-### 1. `src/services/tmdbTransformer.ts`
+**`src/services/tmdbTransformer.ts`**
+- Add `backdropSmall` using TMDB `w300` size to all transform functions
+- Add `backdrop_small` already exists in the size map as `w780` -- will add a new `backdrop_thumb` at `w300`
 
-Update the `getImageUrl` helper to support more size options:
+**`src/data/watchContent.ts`**
+- Add optional `backdropSmall?: string` field to `WatchContent` interface
 
-```typescript
-type ImageSize = "poster_small" | "poster_medium" | "poster_large" | "backdrop_small" | "backdrop_medium" | "backdrop_large";
+**`src/components/watch/SearchOverlay.tsx`**
+- Replace `item.backdrop || item.poster` with `item.backdropSmall || item.poster` for content result thumbnails
+- Wrap each image in a skeleton container that shows a shimmer until `onLoad` fires
+- Apply blur-up CSS transition on load
+
+**`src/components/watch/ContentRow.tsx`**
+- Add `loading="lazy"` to thumbnail images
+- Add skeleton placeholder with shimmer while image loads
+- Apply fade-in on load
+
+**`src/components/watch/ContentGrid.tsx`**
+- Add skeleton placeholder behind each poster image (same shimmer pattern)
+- Already has `loading="lazy"` -- no change needed there
+
+### Skeleton + fade-in pattern (used in all three components)
+
+```tsx
+const [loaded, setLoaded] = useState(false);
+
+<div className="relative w-full h-full bg-muted/30">
+  {/* Skeleton shimmer */}
+  {!loaded && (
+    <div className="absolute inset-0 animate-pulse bg-muted/50 rounded" />
+  )}
+  <img
+    src={imageUrl}
+    alt={title}
+    loading="lazy"
+    className={cn(
+      "w-full h-full object-cover transition-all duration-300",
+      loaded ? "opacity-100 scale-100 blur-0" : "opacity-0 scale-105 blur-sm"
+    )}
+    onLoad={() => setLoaded(true)}
+    onError={(e) => {
+      e.currentTarget.src = '/placeholder.svg';
+      setLoaded(true);
+    }}
+  />
+</div>
 ```
 
-Update all transform functions to output both a small and large poster URL (e.g., `poster` for standard use, `posterSmall` or keep `poster` as the small version and add `posterLarge` for detail views).
+### Image size changes summary
 
-**Simpler approach**: Change the default poster size from `w500` to `w342` globally, and add a `posterLarge` field for detail views. Change backdrop default from `original` to `w1280`.
+| Context | Current source | New source | Approx size |
+|---------|---------------|------------|-------------|
+| Search result thumbnails | backdrop w1280 | backdropSmall w300 | ~15KB vs ~200KB |
+| Content row thumbnails | poster w342 | poster w342 (unchanged) | ~50KB |
+| Content grid thumbnails | poster w342 | poster w342 (unchanged) | ~50KB |
+| Person search photos | w185 | w185 (unchanged) | ~15KB |
 
-### 2. `src/data/watchContent.ts`
+### Files summary
 
-Add optional `posterLarge` field to `WatchContent` interface for detail/hero views that need higher resolution.
-
-### 3. `src/components/watch/ContentDetail.tsx`
-
-Use `posterLarge` (w500) for the detail view poster instead of the default smaller one.
-
-### 4. `src/components/watch/FeaturedHero.tsx`
-
-Already uses `backdrop` -- this will automatically benefit from the `original` to `w1280` change.
-
-### Summary of File Changes
-
-| File | Change |
-|------|--------|
-| `src/services/tmdbTransformer.ts` | Change poster default to w342, backdrop to w1280, add posterLarge (w500) output |
-| `src/data/watchContent.ts` | Add optional `posterLarge` field |
-| `src/components/watch/ContentDetail.tsx` | Use `posterLarge` for the detail poster image |
-
-This is a low-risk change that applies globally to all content (movies, series, search results, all categories) since everything flows through the same transformer functions.
+| File | Changes |
+|------|---------|
+| `src/data/watchContent.ts` | Add `backdropSmall` field |
+| `src/services/tmdbTransformer.ts` | Add `backdrop_thumb` (w300) size, output `backdropSmall` |
+| `src/components/watch/SearchOverlay.tsx` | Use `backdropSmall`, add skeleton + blur-up |
+| `src/components/watch/ContentRow.tsx` | Add `loading="lazy"`, skeleton + blur-up |
+| `src/components/watch/ContentGrid.tsx` | Add skeleton + blur-up behind poster images |
 
