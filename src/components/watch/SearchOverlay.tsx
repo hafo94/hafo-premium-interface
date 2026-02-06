@@ -612,6 +612,9 @@ const SearchOverlay = ({ isOpen, onClose, onSelect, mediaFilter = 'all' }: Searc
                                 {item.year} • {item.type === 'movie' ? 'Movie' : 'Series'}
                                 {item.rating && ` • ⭐ ${item.rating}`}
                               </p>
+                              {item.creditRole && (
+                                <p className="text-[10px] text-muted-foreground/70 italic">{item.creditRole}</p>
+                              )}
                             </div>
                           </button>
                         );
