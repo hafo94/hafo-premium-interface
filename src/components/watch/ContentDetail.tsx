@@ -265,7 +265,11 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
               </p>
               <p className="text-muted-foreground">
                 <span className="text-foreground/60">Rating: </span>
-                {content.rating}/10
+                {enrichedContent.imdbRating ? (
+                  <span className="text-accent font-semibold">IMDb {enrichedContent.imdbRating}</span>
+                ) : (
+                  <>{content.rating}/10</>
+                )}
               </p>
             </div>
           </div>

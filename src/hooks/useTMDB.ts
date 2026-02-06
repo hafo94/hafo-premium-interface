@@ -1,5 +1,5 @@
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { tmdbService, TMDBPerson, TMDBPersonCredits } from "@/services/tmdbService";
+import { tmdbService, TMDBPerson, TMDBPersonCredits, IMDBRating } from "@/services/tmdbService";
 import { 
   transformTMDBMovie, 
   transformTMDBSeries, 
@@ -108,7 +108,22 @@ export const useMovieDetails = (id: number | undefined) => {
     queryFn: async () => {
       if (!id) throw new Error("Movie ID required");
       const response = await tmdbService.getMovieDetails(id);
-      return transformTMDBMovieDetails(response);
+      const content = transformTMDBMovieDetails(response);
+      
+      // Fetch IMDB rating if imdb_id is available
+      if (content.imdbId) {
+        try {
+          const imdbData = await tmdbService.getIMDBRating(content.imdbId);
+          const parsed = parseFloat(imdbData.imdbRating);
+          if (!isNaN(parsed)) {
+            content.imdbRating = parsed;
+          }
+        } catch (e) {
+          console.warn("Failed to fetch IMDB rating:", e);
+        }
+      }
+      
+      return content;
     },
     enabled: !!id,
     staleTime: DETAILS_STALE_TIME,
@@ -121,7 +136,22 @@ export const useSeriesDetails = (id: number | undefined) => {
     queryFn: async () => {
       if (!id) throw new Error("Series ID required");
       const response = await tmdbService.getSeriesDetails(id);
-      return transformTMDBSeriesDetails(response);
+      const content = transformTMDBSeriesDetails(response);
+      
+      // Fetch IMDB rating if imdb_id is available
+      if (content.imdbId) {
+        try {
+          const imdbData = await tmdbService.getIMDBRating(content.imdbId);
+          const parsed = parseFloat(imdbData.imdbRating);
+          if (!isNaN(parsed)) {
+            content.imdbRating = parsed;
+          }
+        } catch (e) {
+          console.warn("Failed to fetch IMDB rating:", e);
+        }
+      }
+      
+      return content;
     },
     enabled: !!id,
     staleTime: DETAILS_STALE_TIME,

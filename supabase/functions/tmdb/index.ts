@@ -77,8 +77,36 @@ serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        tmdbUrl = `${TMDB_BASE_URL}/tv/${id}?append_to_response=credits,similar`;
+        tmdbUrl = `${TMDB_BASE_URL}/tv/${id}?append_to_response=credits,similar,external_ids`;
         break;
+      case "imdb-rating": {
+        const imdbId = url.searchParams.get("imdb_id");
+        if (!imdbId) {
+          return new Response(
+            JSON.stringify({ error: "IMDB ID required" }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const OMDB_API_KEY = Deno.env.get("OMDB_API_KEY");
+        if (!OMDB_API_KEY) {
+          return new Response(
+            JSON.stringify({ error: "OMDB_API_KEY not configured" }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const omdbResponse = await fetch(`http://www.omdbapi.com/?i=${imdbId}&apikey=${OMDB_API_KEY}`);
+        if (!omdbResponse.ok) {
+          return new Response(
+            JSON.stringify({ error: "OMDb API error" }),
+            { status: omdbResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        const omdbData = await omdbResponse.json();
+        return new Response(
+          JSON.stringify({ imdbRating: omdbData.imdbRating || "N/A", imdbVotes: omdbData.imdbVotes || "N/A" }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       case "search":
         if (!query) {
           return new Response(
