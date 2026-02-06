@@ -1,62 +1,87 @@
 
 
-# Improve Actor Filmography: Sort by Score + Show Role
+# Use IMDB Ratings via OMDb API
 
 ## Problem
 
-When clicking an actor in search, the filmography is poorly ordered and lacks role context. Titles without scores appear mixed in randomly instead of being pushed to the bottom.
+TMDB ratings are unreliable for titles with few votes. IMDB ratings are more trusted and consistent because they have a much larger voter base.
+
+## Approach
+
+Rather than scraping IMDB (which violates their terms and is blocked), we'll use the **OMDb API** -- a free, legal API that returns IMDB ratings by IMDB ID or by title.
+
+TMDB already returns `imdb_id` in movie/series detail responses, so we can cross-reference easily.
+
+## How It Works
+
+```text
+User sees title --> TMDB provides imdb_id --> OMDb returns IMDB rating
+```
+
+For list views (grids, rows) where we only have TMDB data, we'll keep TMDB ratings as a fallback but prioritize IMDB ratings when available (e.g., in detail views and filmography).
+
+## Setup Required
+
+You'll need a free OMDb API key from omdbapi.com/apikey.aspx (free tier allows 1,000 requests/day). You'll be prompted to enter it as a secret.
 
 ## Changes
 
-### 1. `src/data/watchContent.ts`
-- Add `creditRole?: string` to the `WatchContent` interface
+### 1. Edge function: `supabase/functions/tmdb/index.ts`
 
-### 2. `src/hooks/useTMDB.ts` (`usePersonCredits` hook)
-- Process cast and crew separately, attaching role info:
-  - Cast entries: `creditRole = "Actor"`
-  - Crew entries: `creditRole = credit.job` (e.g., "Director", "Producer")
-- When deduplicating, prefer cast over crew (if someone acted AND produced, show "Actor")
-- Filter out items with no poster image
-- **Sorting logic:**
-  1. Items WITH a rating (> 0) come first, sorted by rating descending
-  2. Items WITHOUT a rating go to the bottom, sorted by popularity descending
-  3. Within same-rating items, popularity is used as tiebreaker
+Add a new endpoint `imdb-rating` that:
+- Accepts an `imdb_id` parameter
+- Calls OMDb API (`http://www.omdbapi.com/?i={imdb_id}&apikey={key}`)
+- Returns the IMDB rating and vote count
+- Uses the `OMDB_API_KEY` secret
 
-### 3. `src/components/watch/SearchOverlay.tsx`
-- Display `creditRole` as a small subtle label on each filmography card, below the year/type/rating line
+Also update `movie-details` and `series-details` endpoints to include `imdb_id` in the response passthrough (TMDB already returns this field -- it just needs to flow through).
 
-## Technical Details
+### 2. Service: `src/services/tmdbService.ts`
 
-### Sorting implementation
+- Add `imdb_id` to `TMDBMovieDetails` and `TMDBSeriesDetails` interfaces
+- Add `getIMDBRating(imdbId: string)` method that calls the new edge function endpoint
+- Returns `{ imdbRating: string, imdbVotes: string }` (e.g., "8.4", "1,234,567")
 
-```typescript
-return uniqueCredits.sort((a, b) => {
-  const aRating = a.rating || 0;
-  const bRating = b.rating || 0;
-  const aHasRating = aRating > 0;
-  const bHasRating = bRating > 0;
+### 3. Data model: `src/data/watchContent.ts`
 
-  // Rated items always come before unrated
-  if (aHasRating && !bHasRating) return -1;
-  if (!aHasRating && bHasRating) return 1;
+- Add optional `imdbId?: string` and `imdbRating?: number` fields to `WatchContent`
 
-  // Both rated: sort by rating desc
-  if (aHasRating && bHasRating) {
-    if (bRating !== aRating) return bRating - aRating;
-  }
+### 4. Transformer: `src/services/tmdbTransformer.ts`
 
-  // Tiebreaker: popularity
-  return (b.popularity || 0) - (a.popularity || 0);
-});
-```
+- In `transformTMDBMovieDetails` and `transformTMDBSeriesDetails`, pass through `imdbId` from the TMDB detail response
 
-This requires also adding an optional `popularity?: number` field to `WatchContent` (currently not carried through from TMDB data).
+### 5. Hook: `src/hooks/useTMDB.ts`
 
-### Files summary
+- Update `useMovieDetails` and `useSeriesDetails` to fetch the IMDB rating as a secondary call after getting the TMDB details (only if `imdb_id` is available)
+- For `usePersonCredits`, keep using TMDB ratings (fetching IMDB for every credit would be too many API calls)
+
+### 6. UI: `src/components/watch/ContentDetail.tsx`
+
+- Display the IMDB rating (with the IMDB logo/icon) when available, falling back to TMDB rating
+- Show something like: "IMDb 8.4" instead of the current star rating
+
+### 7. UI: `src/components/watch/SearchOverlay.tsx`
+
+- In filmography cards, continue showing TMDB ratings (fetching IMDB for dozens of credits is impractical)
+- In detail view (ContentDetail), show IMDB rating when available
+
+## Where IMDB vs TMDB ratings are used
+
+| View | Rating Source | Reason |
+|------|-------------|--------|
+| Content detail page | IMDB (via OMDb) | Single item, worth the extra API call |
+| Browse grids/rows | TMDB | Too many items to fetch IMDB for each |
+| Actor filmography | TMDB | Too many items to fetch IMDB for each |
+| Search results | TMDB | Too many items to fetch IMDB for each |
+
+## Files summary
 
 | File | Change |
 |------|--------|
-| `src/data/watchContent.ts` | Add `creditRole?: string` and `popularity?: number` fields |
-| `src/hooks/useTMDB.ts` | Rework `usePersonCredits`: preserve roles, sort rated first then unrated, filter no-poster |
-| `src/components/watch/SearchOverlay.tsx` | Display `creditRole` label on filmography cards |
+| `supabase/functions/tmdb/index.ts` | Add `imdb-rating` endpoint using OMDb API |
+| `src/services/tmdbService.ts` | Add `imdb_id` to detail interfaces, add `getIMDBRating()` |
+| `src/data/watchContent.ts` | Add `imdbId` and `imdbRating` fields |
+| `src/services/tmdbTransformer.ts` | Pass through `imdbId` in detail transforms |
+| `src/hooks/useTMDB.ts` | Fetch IMDB rating in detail hooks |
+| `src/components/watch/ContentDetail.tsx` | Display IMDB rating with fallback to TMDB |
 
