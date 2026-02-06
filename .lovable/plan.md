@@ -1,65 +1,54 @@
 
-# Fix Low-Vote TMDB Ratings Showing at Top
 
-## Problem
-Titles with very few TMDB ratings (e.g., 1 vote with a 10.0 score) appear at the top of sorted lists like person filmography results. These inflated scores are unreliable and should not be trusted until an IMDb rating confirms them.
+# Fix Navigation Centering + Region Filter for Now Playing
 
-## Rule
-If a title has fewer than 20 TMDB votes, treat its TMDB rating as null for sorting purposes. It should sink to the bottom until an IMDb rating is fetched, at which point it gets placed according to its IMDb score.
+## 1. Scroll Hero into View on Focus
 
-## Changes
+**File: `src/components/watch/FeaturedHero.tsx`**
 
-### 1. Add `voteCount` to `WatchContent` interface
-**File:** `src/data/watchContent.ts`
+- Add a `useRef` on the outer wrapper div
+- Add a `useEffect` that calls `scrollIntoView({ behavior: 'smooth', block: 'center' })` when `isActive` becomes true
+- This ensures the viewport centers on the hero when the user arrows up from the content grid
 
-Add a new optional field `voteCount?: number` alongside the existing TMDB fields. This allows downstream sorting logic to check vote reliability.
+## 2. Scroll Header into View on Focus
 
-### 2. Pass `vote_count` through transformers
-**File:** `src/services/tmdbTransformer.ts`
+**File: `src/components/ModeHeader.tsx`**
 
-Update all four transform functions (`transformTMDBMovie`, `transformTMDBSeries`, `transformTMDBSearchResult`, `transformTMDBMovieDetails`, `transformTMDBSeriesDetails`) to include `voteCount` in the output.
+- Add a ref to the `<header>` element (line 129)
+- Add a `useEffect` that calls `scrollIntoView({ behavior: 'smooth', block: 'start' })` when `isHeaderFocused` becomes true
+- This ensures the page scrolls to the top when the user arrows up from the hero to the header
 
-### 3. Apply the "< 20 votes = null rating" rule in sorting
+## 3. Add Region Filter to "Now Playing" and "On The Air"
 
-**File:** `src/hooks/useIMDBRatings.ts` -- Update `useIMDBSortedContent`:
-- When merging ratings, if an item has `voteCount < 20` and no IMDb rating yet, treat its effective rating as 0 (bottom of list).
-- Once an IMDb rating arrives, use it normally regardless of vote count.
+**File: `supabase/functions/tmdb/index.ts`**
 
-**File:** `src/hooks/useTMDB.ts` -- Update `usePersonCredits` sorting:
-- Same rule: if `voteCount < 20`, treat the TMDB rating as 0 for sorting. This directly fixes the Sydney Sweeney filmography issue.
+Update two endpoint URLs to include region parameters for both SE (Sweden) and US:
 
-### 4. Update `selectFeaturedItems` in `useIMDBRatings.ts`
-- When checking `isHot` or selecting featured items, also require `voteCount >= 20` or an existing IMDb rating, so low-vote titles don't get promoted to the hero carousel.
-
-## Technical Details
-
-### WatchContent addition
 ```typescript
-// src/data/watchContent.ts
-voteCount?: number;  // TMDB vote count for reliability filtering
+case "now-playing":
+  tmdbUrl = `${TMDB_BASE_URL}/movie/now_playing?page=${page}&region=SE|US`;
+  break;
+case "on-the-air":
+  tmdbUrl = `${TMDB_BASE_URL}/tv/on_the_air?page=${page}&timezone=Europe/Stockholm`;
+  break;
 ```
 
-### Transformer example
-```typescript
-// In transformTMDBMovie:
-voteCount: movie.vote_count,
-```
+Note: TMDB's `region` parameter only accepts a single ISO 3166-1 code. To support both SE and US, the edge function will need to make two requests (one per region) and merge/deduplicate the results. Alternatively, if one region is "primary," we use that and fall back. The simplest reliable approach:
 
-### Sorting logic (person credits)
-```typescript
-// Effective rating considers vote count threshold
-const effectiveRating = (item: WatchContent) => {
-  if (item.imdbRating) return item.imdbRating;
-  if ((item.voteCount || 0) >= 20) return item.rating || 0;
-  return 0; // Low-vote, no IMDb = bottom
-};
-```
+- Make two parallel fetches for `now_playing` with `region=SE` and `region=US`
+- Merge results, deduplicate by movie ID
+- Sort by popularity (descending) to maintain expected order
+- Return combined results with correct `total_pages` / `total_results`
 
-### Files changed
+For `on-the-air`, TMDB does not support a `region` param but supports `timezone`. We can use `Europe/Stockholm` as the primary timezone.
+
+Redeploy the `tmdb` edge function after changes.
+
+## Files Changed
 
 | File | Change |
 |------|--------|
-| `src/data/watchContent.ts` | Add `voteCount` field |
-| `src/services/tmdbTransformer.ts` | Pass `vote_count` through all transformers |
-| `src/hooks/useTMDB.ts` | Apply vote threshold in `usePersonCredits` sorting |
-| `src/hooks/useIMDBRatings.ts` | Apply vote threshold in `useIMDBSortedContent` and `selectFeaturedItems` |
+| `src/components/watch/FeaturedHero.tsx` | Add ref + scrollIntoView when `isActive` |
+| `src/components/ModeHeader.tsx` | Add ref + scrollIntoView when header focused |
+| `supabase/functions/tmdb/index.ts` | Dual-region fetch for now-playing (SE + US), timezone for on-the-air |
+
