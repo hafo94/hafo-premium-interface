@@ -15,10 +15,14 @@ export const useIMDBSortedContent = (
 ) => {
   const batchItems = useMemo(
     () =>
-      items.map((item) => ({
-        tmdb_id: parseInt(item.id, 10),
-        media_type: item.type === "movie" ? "movie" : "tv",
-      })),
+      items.map((item) => {
+        // IDs are like "tmdb-movie-550" or "tmdb-tv-123"
+        const numericId = parseInt(item.id.replace(/^tmdb-(movie|tv)-/, ""), 10);
+        return {
+          tmdb_id: isNaN(numericId) ? 0 : numericId,
+          media_type: item.type === "movie" ? "movie" : "tv",
+        };
+      }).filter(i => i.tmdb_id > 0),
     [items]
   );
 
@@ -36,8 +40,8 @@ export const useIMDBSortedContent = (
 
     // Merge IMDb ratings into items
     const merged = items.map((item) => {
-      const tmdbId = parseInt(item.id, 10);
-      const rating = ratingsData.ratings[tmdbId];
+      const numericId = parseInt(item.id.replace(/^tmdb-(movie|tv)-/, ""), 10);
+      const rating = numericId ? ratingsData.ratings[numericId] : undefined;
       if (rating) {
         return {
           ...item,
