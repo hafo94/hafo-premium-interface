@@ -144,7 +144,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
         {/* Hero Backdrop */}
         <div className="relative aspect-video flex-shrink-0">
           <img
-            src={content.backdrop}
+            src={content.posterLarge || content.backdrop}
             alt=""
             className="w-full h-full object-cover"
           />
