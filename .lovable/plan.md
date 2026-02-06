@@ -1,112 +1,65 @@
 
-
-# Use IMDb Ratings for Sorting and Trending Selection
+# Fix Low-Vote TMDB Ratings Showing at Top
 
 ## Problem
-TMDB ratings are unreliable for titles with few votes. We want to use IMDb ratings (via OMDb) to sort content in browse rows/grids and to determine which titles appear as "trending" or featured.
+Titles with very few TMDB ratings (e.g., 1 vote with a 10.0 score) appear at the top of sorted lists like person filmography results. These inflated scores are unreliable and should not be trusted until an IMDb rating confirms them.
 
-## Challenge: API Rate Limits
-The OMDb free tier allows only **1,000 requests/day**. Each browse page shows 20 items across multiple rows, so fetching ratings on every page load would exhaust the limit quickly.
-
-## Solution: Database Cache + Batch Fetching
-
-We'll create a persistent cache table in the database that stores IMDb ratings. The edge function checks the cache first and only calls OMDb on a cache miss. Once a rating is cached, it's reused for 7 days before refreshing. This means after initial population, most requests are served from cache with zero OMDb calls.
-
-```text
-Client requests 20 titles
-  --> Edge function checks cache table
-  --> Cache hits: return immediately
-  --> Cache misses: fetch from OMDb, store in cache, return
-  --> Client re-sorts items by IMDb rating
-```
+## Rule
+If a title has fewer than 20 TMDB votes, treat its TMDB rating as null for sorting purposes. It should sink to the bottom until an IMDb rating is fetched, at which point it gets placed according to its IMDb score.
 
 ## Changes
 
-### 1. Database: Create `imdb_ratings_cache` table
+### 1. Add `voteCount` to `WatchContent` interface
+**File:** `src/data/watchContent.ts`
 
-| Column | Type | Description |
-|--------|------|-------------|
-| tmdb_id | integer (PK) | TMDB content ID |
-| media_type | text | "movie" or "tv" |
-| imdb_id | text | IMDb ID (e.g., tt0468569) |
-| imdb_rating | numeric | Rating value (e.g., 9.1) |
-| imdb_votes | text | Vote count string |
-| cached_at | timestamptz | When it was cached |
+Add a new optional field `voteCount?: number` alongside the existing TMDB fields. This allows downstream sorting logic to check vote reliability.
 
-No RLS needed -- this is public reference data, not user-specific.
+### 2. Pass `vote_count` through transformers
+**File:** `src/services/tmdbTransformer.ts`
 
-### 2. Edge function: `supabase/functions/tmdb/index.ts`
+Update all four transform functions (`transformTMDBMovie`, `transformTMDBSeries`, `transformTMDBSearchResult`, `transformTMDBMovieDetails`, `transformTMDBSeriesDetails`) to include `voteCount` in the output.
 
-Add a new `batch-imdb-ratings` endpoint that:
-- Accepts a JSON body with `items: [{ tmdb_id, media_type }]` (up to 20 items)
-- For each item, checks the cache table first
-- For cache misses, fetches the TMDB detail to get the `imdb_id`, then calls OMDb
-- Stores results in cache and returns all ratings
-- Uses POST method to send the batch payload
+### 3. Apply the "< 20 votes = null rating" rule in sorting
 
-### 3. Service: `src/services/tmdbService.ts`
+**File:** `src/hooks/useIMDBRatings.ts` -- Update `useIMDBSortedContent`:
+- When merging ratings, if an item has `voteCount < 20` and no IMDb rating yet, treat its effective rating as 0 (bottom of list).
+- Once an IMDb rating arrives, use it normally regardless of vote count.
 
-Add `getBatchIMDBRatings(items)` method that calls the new batch endpoint.
+**File:** `src/hooks/useTMDB.ts` -- Update `usePersonCredits` sorting:
+- Same rule: if `voteCount < 20`, treat the TMDB rating as 0 for sorting. This directly fixes the Sydney Sweeney filmography issue.
 
-### 4. Hooks: `src/hooks/useTMDB.ts`
-
-Update list hooks (`usePopularMovies`, `useTrendingMovies`, `useTopRatedMovies`, `useNowPlayingMovies`, and their series equivalents) to:
-- After fetching the TMDB list, fire a batch IMDb rating request
-- Merge IMDb ratings into the `WatchContent` items
-- Re-sort by IMDb rating (rated first descending, unrated last by TMDB popularity)
-- Use a separate React Query for the IMDb batch so the TMDB data renders immediately, then updates with IMDb ratings when available
-
-### 5. Transformer: `src/services/tmdbTransformer.ts`
-
-No changes needed -- `imdbRating` and `imdbId` fields already exist on `WatchContent`.
-
-### 6. Featured Hero selection
-
-In `MoviesContent.tsx` and `SeriesContent.tsx`, update `featuredItems` logic to prefer titles with high IMDb ratings (>= 7.5) for the hero carousel, falling back to the existing backdrop filter.
+### 4. Update `selectFeaturedItems` in `useIMDBRatings.ts`
+- When checking `isHot` or selecting featured items, also require `voteCount >= 20` or an existing IMDb rating, so low-vote titles don't get promoted to the hero carousel.
 
 ## Technical Details
 
-### Batch endpoint logic (edge function)
-
+### WatchContent addition
 ```typescript
-case "batch-imdb-ratings": {
-  // Parse POST body: { items: [{ tmdb_id, media_type }] }
-  // 1. Query cache table for all tmdb_ids
-  // 2. For cache misses:
-  //    a. Fetch TMDB detail to get imdb_id
-  //    b. Call OMDb for rating
-  //    c. Insert into cache
-  // 3. Return { ratings: { [tmdb_id]: { imdbRating, imdbId } } }
-}
+// src/data/watchContent.ts
+voteCount?: number;  // TMDB vote count for reliability filtering
 ```
 
-### Client-side merge and sort
-
+### Transformer example
 ```typescript
-// After TMDB data loads, fire batch request
-const imdbQuery = useQuery({
-  queryKey: ["imdb-batch", tmdbIds],
-  queryFn: () => tmdbService.getBatchIMDBRatings(items),
-  enabled: items.length > 0,
-  staleTime: DETAILS_STALE_TIME,
-});
-
-// Merge: overlay IMDb ratings onto WatchContent items
-// Sort: IMDb-rated first (desc), then TMDB-rated, then unrated
+// In transformTMDBMovie:
+voteCount: movie.vote_count,
 ```
 
-### Cache expiry
+### Sorting logic (person credits)
+```typescript
+// Effective rating considers vote count threshold
+const effectiveRating = (item: WatchContent) => {
+  if (item.imdbRating) return item.imdbRating;
+  if ((item.voteCount || 0) >= 20) return item.rating || 0;
+  return 0; // Low-vote, no IMDb = bottom
+};
+```
 
-Ratings older than 7 days are treated as stale and re-fetched. This keeps data fresh without excessive API calls.
-
-### Files summary
+### Files changed
 
 | File | Change |
 |------|--------|
-| Database migration | Create `imdb_ratings_cache` table |
-| `supabase/functions/tmdb/index.ts` | Add `batch-imdb-ratings` POST endpoint with cache logic |
-| `src/services/tmdbService.ts` | Add `getBatchIMDBRatings()` method |
-| `src/hooks/useTMDB.ts` | Add IMDb batch fetch + merge + sort to all list hooks |
-| `src/components/content/MoviesContent.tsx` | Update featured hero selection to prefer high IMDb ratings |
-| `src/components/content/SeriesContent.tsx` | Same featured hero update |
-
+| `src/data/watchContent.ts` | Add `voteCount` field |
+| `src/services/tmdbTransformer.ts` | Pass `vote_count` through all transformers |
+| `src/hooks/useTMDB.ts` | Apply vote threshold in `usePersonCredits` sorting |
+| `src/hooks/useIMDBRatings.ts` | Apply vote threshold in `useIMDBSortedContent` and `selectFeaturedItems` |
