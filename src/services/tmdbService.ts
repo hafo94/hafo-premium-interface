@@ -70,6 +70,10 @@ export interface IMDBRating {
   imdbVotes: string;
 }
 
+export interface BatchIMDBRatingsResponse {
+  ratings: Record<number, { imdbRating: number | null; imdbId: string | null }>;
+}
+
 export interface TMDBSearchResult {
   id: number;
   media_type: "movie" | "tv" | "person";
@@ -193,5 +197,26 @@ export const tmdbService = {
 
   searchTV: async (query: string, page = 1): Promise<TMDBResponse<TMDBSeries>> => {
     return callTMDB('search-tv', { query, page: String(page) });
+  },
+
+  getBatchIMDBRatings: async (items: { tmdb_id: number; media_type: string }[]): Promise<BatchIMDBRatingsResponse> => {
+    const projectUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+    
+    const response = await fetch(`${projectUrl}/functions/v1/tmdb?endpoint=batch-imdb-ratings`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ items }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Batch IMDB request failed: ${response.status}`);
+    }
+
+    return response.json();
   },
 };

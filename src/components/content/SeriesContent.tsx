@@ -8,6 +8,7 @@ import { WatchContent } from "@/data/watchContent";
 import { useMyList } from "@/hooks/useMyList";
 import { useFocus } from "@/contexts/FocusContext";
 import { useSeriesPageData } from "@/hooks/useTMDB";
+import { useIMDBSortedContent, selectFeaturedItems } from "@/hooks/useIMDBRatings";
 import { useInfinitePopularSeries, useInfiniteOnTheAirSeries, useInfiniteSeriesByGenre } from "@/hooks/useInfiniteContent";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSeriesGenreLabel } from "@/data/genreConfig";
@@ -28,7 +29,13 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
   const isGridView = activeSection === "popular" || activeSection === "on-air" || isGenreSelected;
 
   // Fetch TMDB data for home view
-  const { trendingSeries, isLoading: homeLoading, error: homeError, popularSeries, topRatedSeries, onTheAir } = useSeriesPageData();
+  const { trendingSeries: rawTrending, isLoading: homeLoading, error: homeError, popularSeries: rawPopular, topRatedSeries: rawTopRated, onTheAir: rawOnTheAir } = useSeriesPageData();
+
+  // Sort each row by IMDb ratings
+  const trendingSeries = useIMDBSortedContent(rawTrending, "trending-series");
+  const popularSeries = useIMDBSortedContent(rawPopular, "popular-series");
+  const topRatedSeries = useIMDBSortedContent(rawTopRated, "top-rated-series");
+  const onTheAir = useIMDBSortedContent(rawOnTheAir, "on-the-air-series");
 
   // Infinite queries for grid views
   const { 
@@ -86,12 +93,12 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
   // Grid focus index (flat index for 2D navigation)
   const [gridFocusIndex, setGridFocusIndex] = useState(0);
 
-  // Featured content - use trending series for hero
+  // Featured content - prefer high IMDb-rated titles
   const featuredItems = useMemo(() => {
     if (isGridView && gridItems.length > 0) {
-      return gridItems.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
+      return selectFeaturedItems(gridItems, 5);
     }
-    return trendingSeries.filter((item) => item.backdrop && item.backdrop !== "/placeholder.svg").slice(0, 5);
+    return selectFeaturedItems(trendingSeries, 5);
   }, [trendingSeries, gridItems, isGridView]);
 
   const [featuredIndex, setFeaturedIndex] = useState(0);
