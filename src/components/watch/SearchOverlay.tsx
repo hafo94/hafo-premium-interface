@@ -577,19 +577,29 @@ const SearchOverlay = ({ isOpen, onClose, onSelect, mediaFilter = 'all' }: Searc
                                 : 'hover:ring-2 hover:ring-foreground/50'
                             )}
                           >
-                            <img
-                              src={item.backdrop || item.poster}
-                              alt={item.title}
-                              className="w-full h-full object-cover transition-opacity duration-300"
-                              style={{ opacity: 0 }}
-                              onLoad={(e) => {
-                                (e.target as HTMLImageElement).style.opacity = '1';
-                              }}
-                              onError={(e) => {
-                                (e.target as HTMLImageElement).src = '/placeholder.svg';
-                                (e.target as HTMLImageElement).style.opacity = '1';
-                              }}
-                            />
+                            <div className="absolute inset-0 bg-muted/30">
+                              {/* Skeleton shimmer */}
+                              <div className="absolute inset-0 animate-pulse bg-muted/50" data-skeleton />
+                              <img
+                                src={item.backdropSmall || item.poster}
+                                alt={item.title}
+                                loading="lazy"
+                                className="w-full h-full object-cover transition-all duration-300 opacity-0 scale-105 blur-sm"
+                                onLoad={(e) => {
+                                  const img = e.target as HTMLImageElement;
+                                  img.classList.remove('opacity-0', 'scale-105', 'blur-sm');
+                                  img.classList.add('opacity-100', 'scale-100', 'blur-0');
+                                  img.parentElement?.querySelector('[data-skeleton]')?.remove();
+                                }}
+                                onError={(e) => {
+                                  const img = e.target as HTMLImageElement;
+                                  img.src = '/placeholder.svg';
+                                  img.classList.remove('opacity-0', 'scale-105', 'blur-sm');
+                                  img.classList.add('opacity-100', 'scale-100', 'blur-0');
+                                  img.parentElement?.querySelector('[data-skeleton]')?.remove();
+                                }}
+                              />
+                            </div>
                             <div
                               className={cn(
                                 'absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent',

@@ -72,12 +72,29 @@ const ContentRow = ({
                     : undefined
                 }}
               >
-                {/* Thumbnail */}
-                <img
-                  src={item.poster}
-                  alt={item.title}
-                  className="w-full h-full object-cover"
-                />
+                {/* Thumbnail with skeleton */}
+                <div className="absolute inset-0 bg-muted/30">
+                  <div className="absolute inset-0 animate-pulse bg-muted/50" data-skeleton />
+                  <img
+                    src={item.poster}
+                    alt={item.title}
+                    loading="lazy"
+                    className="w-full h-full object-cover transition-all duration-300 opacity-0 scale-105 blur-sm"
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      img.classList.remove('opacity-0', 'scale-105', 'blur-sm');
+                      img.classList.add('opacity-100', 'scale-100', 'blur-0');
+                      img.parentElement?.querySelector('[data-skeleton]')?.remove();
+                    }}
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      img.src = '/placeholder.svg';
+                      img.classList.remove('opacity-0', 'scale-105', 'blur-sm');
+                      img.classList.add('opacity-100', 'scale-100', 'blur-0');
+                      img.parentElement?.querySelector('[data-skeleton]')?.remove();
+                    }}
+                  />
+                </div>
 
                 {/* Progress Bar (for continue watching) */}
                 {item.progress && item.progress > 0 && (

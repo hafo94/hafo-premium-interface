@@ -24,6 +24,7 @@ export interface WatchContent {
   poster: string;
   posterLarge?: string;
   backdrop: string;
+  backdropSmall?: string;
   seasons?: Season[];
   isHot?: boolean;
   isRecommended?: boolean;

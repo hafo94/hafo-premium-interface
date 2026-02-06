@@ -133,12 +133,28 @@ const ContentGrid = ({
               )}
             >
               <AspectRatio ratio={2 / 3}>
-                <img
-                  src={item.poster || "/placeholder.svg"}
-                  alt={item.title}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-                />
+                <div className="absolute inset-0 bg-muted/30">
+                  <div className="absolute inset-0 animate-pulse bg-muted/50 rounded" data-skeleton />
+                  <img
+                    src={item.poster || "/placeholder.svg"}
+                    alt={item.title}
+                    className="w-full h-full object-cover transition-all duration-300 opacity-0 scale-105 blur-sm"
+                    loading="lazy"
+                    onLoad={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      img.classList.remove('opacity-0', 'scale-105', 'blur-sm');
+                      img.classList.add('opacity-100', 'scale-100', 'blur-0');
+                      img.parentElement?.querySelector('[data-skeleton]')?.remove();
+                    }}
+                    onError={(e) => {
+                      const img = e.target as HTMLImageElement;
+                      img.src = '/placeholder.svg';
+                      img.classList.remove('opacity-0', 'scale-105', 'blur-sm');
+                      img.classList.add('opacity-100', 'scale-100', 'blur-0');
+                      img.parentElement?.querySelector('[data-skeleton]')?.remove();
+                    }}
+                  />
+                </div>
                 {/* Gradient overlay */}
                 <div
                   className={cn(
