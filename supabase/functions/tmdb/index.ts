@@ -170,11 +170,49 @@ serve(async (req) => {
       case "top-rated-series":
         tmdbUrl = `${TMDB_BASE_URL}/tv/top_rated?page=${page}`;
         break;
-      case "now-playing":
-        tmdbUrl = `${TMDB_BASE_URL}/movie/now_playing?page=${page}`;
-        break;
+      case "now-playing": {
+        // Dual-region fetch: SE (Sweden) + US, merge and deduplicate
+        const seUrl = `${TMDB_BASE_URL}/movie/now_playing?page=${page}&region=SE&api_key=${TMDB_API_KEY}`;
+        const usUrl = `${TMDB_BASE_URL}/movie/now_playing?page=${page}&region=US&api_key=${TMDB_API_KEY}`;
+        const [seRes, usRes] = await Promise.all([fetch(seUrl), fetch(usUrl)]);
+        
+        if (!seRes.ok && !usRes.ok) {
+          const errText = await seRes.text();
+          await usRes.text();
+          return new Response(
+            JSON.stringify({ error: "TMDB API error", status: seRes.status }),
+            { status: seRes.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const seData = seRes.ok ? await seRes.json() : { results: [] };
+        const usData = usRes.ok ? await usRes.json() : { results: [] };
+        if (!seRes.ok) await seRes.text();
+        if (!usRes.ok) await usRes.text();
+
+        // Merge and deduplicate by movie ID, sort by popularity desc
+        const seen = new Set<number>();
+        const merged: any[] = [];
+        for (const movie of [...(seData.results || []), ...(usData.results || [])]) {
+          if (!seen.has(movie.id)) {
+            seen.add(movie.id);
+            merged.push(movie);
+          }
+        }
+        merged.sort((a: any, b: any) => (b.popularity || 0) - (a.popularity || 0));
+
+        return new Response(
+          JSON.stringify({
+            results: merged,
+            page: parseInt(page),
+            total_pages: Math.max(seData.total_pages || 1, usData.total_pages || 1),
+            total_results: merged.length,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       case "on-the-air":
-        tmdbUrl = `${TMDB_BASE_URL}/tv/on_the_air?page=${page}`;
+        tmdbUrl = `${TMDB_BASE_URL}/tv/on_the_air?page=${page}&timezone=Europe/Stockholm`;
         break;
       case "movie-details":
         if (!id) {
