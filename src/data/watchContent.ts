@@ -22,6 +22,7 @@ export interface WatchContent {
   genre: string[];
   plot: string;
   poster: string;
+  posterLarge?: string;
   backdrop: string;
   seasons?: Season[];
   isHot?: boolean;
