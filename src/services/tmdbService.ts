@@ -86,6 +86,7 @@ export interface TMDBSearchResult {
   release_date?: string;
   first_air_date?: string;
   genre_ids?: number[];
+  vote_count?: number;
   popularity: number;
 }
 

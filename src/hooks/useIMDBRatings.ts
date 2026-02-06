@@ -52,10 +52,16 @@ export const useIMDBSortedContent = (
       return item;
     });
 
-    // Sort: IMDb-rated first (desc), then by popularity
+    // Effective rating: ignore TMDB rating if < 20 votes
+    const getEffectiveRating = (item: WatchContent) => {
+      if (item.imdbRating) return item.imdbRating;
+      if ((item.voteCount || 0) >= 20) return item.rating || 0;
+      return 0;
+    };
+
     return merged.sort((a, b) => {
-      const aRating = a.imdbRating || 0;
-      const bRating = b.imdbRating || 0;
+      const aRating = getEffectiveRating(a);
+      const bRating = getEffectiveRating(b);
 
       if (aRating > 0 && bRating === 0) return -1;
       if (aRating === 0 && bRating > 0) return 1;
@@ -78,9 +84,11 @@ export const selectFeaturedItems = (
     (item) => item.backdrop && item.backdrop !== "/placeholder.svg"
   );
 
-  // Prefer high IMDb-rated items
+  // Prefer high IMDb-rated items, or reliable TMDB ratings (>= 20 votes)
   const highRated = withBackdrop.filter(
-    (item) => item.imdbRating && item.imdbRating >= 7.5
+    (item) =>
+      (item.imdbRating && item.imdbRating >= 7.5) ||
+      ((item.voteCount || 0) >= 20 && (item.rating || 0) >= 7.5)
   );
 
   if (highRated.length >= count) {

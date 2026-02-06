@@ -84,6 +84,7 @@ export const transformTMDBMovie = (movie: TMDBMovie): WatchContent => ({
   isHot: movie.vote_average >= 7.5 && movie.vote_count > 1000,
   isRecommended: movie.popularity > 50,
   tmdbId: movie.id,
+  voteCount: movie.vote_count,
 });
 
 export const transformTMDBSeries = (series: TMDBSeries): WatchContent => ({
@@ -101,6 +102,7 @@ export const transformTMDBSeries = (series: TMDBSeries): WatchContent => ({
   isHot: series.vote_average >= 7.5 && series.vote_count > 500,
   isRecommended: series.popularity > 50,
   tmdbId: series.id,
+  voteCount: series.vote_count,
 });
 
 export const transformTMDBSearchResult = (result: TMDBSearchResult): WatchContent | null => {
@@ -127,6 +129,7 @@ export const transformTMDBSearchResult = (result: TMDBSearchResult): WatchConten
     isHot: (result.vote_average || 0) >= 7.5,
     isRecommended: result.popularity > 50,
     tmdbId: result.id,
+    voteCount: result.vote_count,
   };
 };
 
@@ -146,6 +149,7 @@ export const transformTMDBMovieDetails = (movie: TMDBMovieDetails): WatchContent
   isHot: movie.vote_average >= 7.5 && movie.vote_count > 1000,
   isRecommended: movie.popularity > 50,
   tmdbId: movie.id,
+  voteCount: movie.vote_count,
   imdbId: movie.imdb_id || undefined,
   cast: movie.credits?.cast.slice(0, 5).map((c) => c.name),
   director: movie.credits?.crew.find((c) => c.job === "Director")?.name,
@@ -168,6 +172,7 @@ export const transformTMDBSeriesDetails = (series: TMDBSeriesDetails): WatchCont
   isHot: series.vote_average >= 7.5 && series.vote_count > 500,
   isRecommended: series.popularity > 50,
   tmdbId: series.id,
+  voteCount: series.vote_count,
   imdbId: series.external_ids?.imdb_id || undefined,
   episodes: series.number_of_episodes,
   cast: series.credits?.cast.slice(0, 5).map((c) => c.name),
