@@ -14,7 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      imdb_ratings_cache: {
+        Row: {
+          cached_at: string
+          imdb_id: string | null
+          imdb_rating: number | null
+          imdb_votes: string | null
+          media_type: string
+          tmdb_id: number
+        }
+        Insert: {
+          cached_at?: string
+          imdb_id?: string | null
+          imdb_rating?: number | null
+          imdb_votes?: string | null
+          media_type: string
+          tmdb_id: number
+        }
+        Update: {
+          cached_at?: string
+          imdb_id?: string | null
+          imdb_rating?: number | null
+          imdb_votes?: string | null
+          media_type?: string
+          tmdb_id?: number
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
