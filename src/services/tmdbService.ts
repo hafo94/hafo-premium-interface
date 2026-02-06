@@ -42,6 +42,7 @@ export interface TMDBMovieDetails extends TMDBMovie {
   genres: { id: number; name: string }[];
   tagline: string;
   status: string;
+  imdb_id?: string;
   credits?: {
     cast: { id: number; name: string; character: string; profile_path: string | null }[];
     crew: { id: number; name: string; job: string }[];
@@ -56,11 +57,17 @@ export interface TMDBSeriesDetails extends TMDBSeries {
   genres: { id: number; name: string }[];
   tagline: string;
   status: string;
+  external_ids?: { imdb_id?: string };
   credits?: {
     cast: { id: number; name: string; character: string; profile_path: string | null }[];
     crew: { id: number; name: string; job: string }[];
   };
   similar?: TMDBResponse<TMDBSeries>;
+}
+
+export interface IMDBRating {
+  imdbRating: string;
+  imdbVotes: string;
 }
 
 export interface TMDBSearchResult {
@@ -158,6 +165,10 @@ export const tmdbService = {
 
   getSeriesDetails: async (id: number): Promise<TMDBSeriesDetails> => {
     return callTMDB('series-details', { id: String(id) });
+  },
+
+  getIMDBRating: async (imdbId: string): Promise<IMDBRating> => {
+    return callTMDB('imdb-rating', { imdb_id: imdbId });
   },
 
   searchContent: async (query: string, page = 1): Promise<TMDBResponse<TMDBSearchResult>> => {

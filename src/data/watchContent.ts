@@ -42,6 +42,9 @@ export interface WatchContent {
   // Credit-specific fields
   creditRole?: string;         // e.g. "Actor", "Director", "Producer"
   popularity?: number;         // TMDB popularity score
+  // IMDB-specific fields
+  imdbId?: string;
+  imdbRating?: number;
 }
 
 export const genres = [
