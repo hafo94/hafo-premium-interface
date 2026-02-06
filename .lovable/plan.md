@@ -1,42 +1,69 @@
 
 
-# Add Settings Access Button to Header
+# Optimize TMDB Image Sizes for Faster Loading
 
 ## Problem
 
-The `SettingsModal` component (with IPTV and Kodi configuration tabs) exists but is never rendered anywhere in the app. There is no UI element to open it.
+Currently, every image pulled from TMDB uses the same large sizes regardless of where it's displayed:
+- **Posters**: Always `w500` (~750KB each) -- even for small 200px thumbnails
+- **Backdrops**: Always `original` (~2-5MB each) -- even when used as small backgrounds
+
+This causes unnecessary bandwidth usage and slower load times, especially when scrolling through grids with 20-60+ items.
 
 ## Solution
 
-Add a subtle settings gear icon to the top-right corner of the header (in `ModeHeader.tsx`), next to the existing time/date display. Clicking it opens the `SettingsModal`.
+Introduce multiple image size options in the transformer and use appropriately sized images throughout the app. Small thumbnails get small images; only hero/detail views get large ones.
+
+## TMDB Available Sizes
+
+| Type | Options |
+|------|---------|
+| Poster | w92, w154, w185, w342, w500, w780 |
+| Backdrop | w300, w780, w1280, original |
+
+## Recommended Size Mapping
+
+| Usage | Current | Proposed | Approx Savings |
+|-------|---------|----------|----------------|
+| Grid/row thumbnails (poster) | w500 | w342 | ~40% smaller |
+| Search result thumbnails | w500 | w185 | ~70% smaller |
+| Detail view poster | w500 | w500 | No change |
+| Hero backdrop | original | w1280 | ~60% smaller |
+| Row/grid backdrop (if used) | original | w780 | ~70% smaller |
 
 ## Changes
 
-### File: `src/components/ModeHeader.tsx`
+### 1. `src/services/tmdbTransformer.ts`
 
-1. Import `Settings` icon from `lucide-react` and import `SettingsModal`
-2. Add a `useState` for controlling the modal open/close state
-3. Add a gear icon button to the right side of the header, placed before the time/date block
-4. Render the `SettingsModal` component with the open state
+Update the `getImageUrl` helper to support more size options:
 
-The right side of the header will look like:
-
-```text
-[gear icon]  |  14:32
-             |  Thu, Feb 6
+```typescript
+type ImageSize = "poster_small" | "poster_medium" | "poster_large" | "backdrop_small" | "backdrop_medium" | "backdrop_large";
 ```
 
-The gear icon will be styled to match the existing minimal aesthetic -- subtle, low opacity, with a hover glow effect. It will also be keyboard-accessible for TV-remote navigation.
+Update all transform functions to output both a small and large poster URL (e.g., `poster` for standard use, `posterSmall` or keep `poster` as the small version and add `posterLarge` for detail views).
 
-### Technical Details
+**Simpler approach**: Change the default poster size from `w500` to `w342` globally, and add a `posterLarge` field for detail views. Change backdrop default from `original` to `w1280`.
 
-- The settings button uses `text-foreground/40 hover:text-foreground/70` to stay subtle
-- The `SettingsModal` is rendered inside `ModeHeader` with its own open/close state
-- No other files need changes since `SettingsModal` already has all the IPTV and Kodi tabs built in
+### 2. `src/data/watchContent.ts`
 
-### Files Modified
+Add optional `posterLarge` field to `WatchContent` interface for detail/hero views that need higher resolution.
+
+### 3. `src/components/watch/ContentDetail.tsx`
+
+Use `posterLarge` (w500) for the detail view poster instead of the default smaller one.
+
+### 4. `src/components/watch/FeaturedHero.tsx`
+
+Already uses `backdrop` -- this will automatically benefit from the `original` to `w1280` change.
+
+### Summary of File Changes
 
 | File | Change |
 |------|--------|
-| `src/components/ModeHeader.tsx` | Add settings button + render SettingsModal |
+| `src/services/tmdbTransformer.ts` | Change poster default to w342, backdrop to w1280, add posterLarge (w500) output |
+| `src/data/watchContent.ts` | Add optional `posterLarge` field |
+| `src/components/watch/ContentDetail.tsx` | Use `posterLarge` for the detail poster image |
+
+This is a low-risk change that applies globally to all content (movies, series, search results, all categories) since everything flows through the same transformer functions.
 
