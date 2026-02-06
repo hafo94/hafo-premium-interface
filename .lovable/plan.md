@@ -1,87 +1,112 @@
 
 
-# Use IMDB Ratings via OMDb API
+# Use IMDb Ratings for Sorting and Trending Selection
 
 ## Problem
+TMDB ratings are unreliable for titles with few votes. We want to use IMDb ratings (via OMDb) to sort content in browse rows/grids and to determine which titles appear as "trending" or featured.
 
-TMDB ratings are unreliable for titles with few votes. IMDB ratings are more trusted and consistent because they have a much larger voter base.
+## Challenge: API Rate Limits
+The OMDb free tier allows only **1,000 requests/day**. Each browse page shows 20 items across multiple rows, so fetching ratings on every page load would exhaust the limit quickly.
 
-## Approach
+## Solution: Database Cache + Batch Fetching
 
-Rather than scraping IMDB (which violates their terms and is blocked), we'll use the **OMDb API** -- a free, legal API that returns IMDB ratings by IMDB ID or by title.
-
-TMDB already returns `imdb_id` in movie/series detail responses, so we can cross-reference easily.
-
-## How It Works
+We'll create a persistent cache table in the database that stores IMDb ratings. The edge function checks the cache first and only calls OMDb on a cache miss. Once a rating is cached, it's reused for 7 days before refreshing. This means after initial population, most requests are served from cache with zero OMDb calls.
 
 ```text
-User sees title --> TMDB provides imdb_id --> OMDb returns IMDB rating
+Client requests 20 titles
+  --> Edge function checks cache table
+  --> Cache hits: return immediately
+  --> Cache misses: fetch from OMDb, store in cache, return
+  --> Client re-sorts items by IMDb rating
 ```
-
-For list views (grids, rows) where we only have TMDB data, we'll keep TMDB ratings as a fallback but prioritize IMDB ratings when available (e.g., in detail views and filmography).
-
-## Setup Required
-
-You'll need a free OMDb API key from omdbapi.com/apikey.aspx (free tier allows 1,000 requests/day). You'll be prompted to enter it as a secret.
 
 ## Changes
 
-### 1. Edge function: `supabase/functions/tmdb/index.ts`
+### 1. Database: Create `imdb_ratings_cache` table
 
-Add a new endpoint `imdb-rating` that:
-- Accepts an `imdb_id` parameter
-- Calls OMDb API (`http://www.omdbapi.com/?i={imdb_id}&apikey={key}`)
-- Returns the IMDB rating and vote count
-- Uses the `OMDB_API_KEY` secret
+| Column | Type | Description |
+|--------|------|-------------|
+| tmdb_id | integer (PK) | TMDB content ID |
+| media_type | text | "movie" or "tv" |
+| imdb_id | text | IMDb ID (e.g., tt0468569) |
+| imdb_rating | numeric | Rating value (e.g., 9.1) |
+| imdb_votes | text | Vote count string |
+| cached_at | timestamptz | When it was cached |
 
-Also update `movie-details` and `series-details` endpoints to include `imdb_id` in the response passthrough (TMDB already returns this field -- it just needs to flow through).
+No RLS needed -- this is public reference data, not user-specific.
 
-### 2. Service: `src/services/tmdbService.ts`
+### 2. Edge function: `supabase/functions/tmdb/index.ts`
 
-- Add `imdb_id` to `TMDBMovieDetails` and `TMDBSeriesDetails` interfaces
-- Add `getIMDBRating(imdbId: string)` method that calls the new edge function endpoint
-- Returns `{ imdbRating: string, imdbVotes: string }` (e.g., "8.4", "1,234,567")
+Add a new `batch-imdb-ratings` endpoint that:
+- Accepts a JSON body with `items: [{ tmdb_id, media_type }]` (up to 20 items)
+- For each item, checks the cache table first
+- For cache misses, fetches the TMDB detail to get the `imdb_id`, then calls OMDb
+- Stores results in cache and returns all ratings
+- Uses POST method to send the batch payload
 
-### 3. Data model: `src/data/watchContent.ts`
+### 3. Service: `src/services/tmdbService.ts`
 
-- Add optional `imdbId?: string` and `imdbRating?: number` fields to `WatchContent`
+Add `getBatchIMDBRatings(items)` method that calls the new batch endpoint.
 
-### 4. Transformer: `src/services/tmdbTransformer.ts`
+### 4. Hooks: `src/hooks/useTMDB.ts`
 
-- In `transformTMDBMovieDetails` and `transformTMDBSeriesDetails`, pass through `imdbId` from the TMDB detail response
+Update list hooks (`usePopularMovies`, `useTrendingMovies`, `useTopRatedMovies`, `useNowPlayingMovies`, and their series equivalents) to:
+- After fetching the TMDB list, fire a batch IMDb rating request
+- Merge IMDb ratings into the `WatchContent` items
+- Re-sort by IMDb rating (rated first descending, unrated last by TMDB popularity)
+- Use a separate React Query for the IMDb batch so the TMDB data renders immediately, then updates with IMDb ratings when available
 
-### 5. Hook: `src/hooks/useTMDB.ts`
+### 5. Transformer: `src/services/tmdbTransformer.ts`
 
-- Update `useMovieDetails` and `useSeriesDetails` to fetch the IMDB rating as a secondary call after getting the TMDB details (only if `imdb_id` is available)
-- For `usePersonCredits`, keep using TMDB ratings (fetching IMDB for every credit would be too many API calls)
+No changes needed -- `imdbRating` and `imdbId` fields already exist on `WatchContent`.
 
-### 6. UI: `src/components/watch/ContentDetail.tsx`
+### 6. Featured Hero selection
 
-- Display the IMDB rating (with the IMDB logo/icon) when available, falling back to TMDB rating
-- Show something like: "IMDb 8.4" instead of the current star rating
+In `MoviesContent.tsx` and `SeriesContent.tsx`, update `featuredItems` logic to prefer titles with high IMDb ratings (>= 7.5) for the hero carousel, falling back to the existing backdrop filter.
 
-### 7. UI: `src/components/watch/SearchOverlay.tsx`
+## Technical Details
 
-- In filmography cards, continue showing TMDB ratings (fetching IMDB for dozens of credits is impractical)
-- In detail view (ContentDetail), show IMDB rating when available
+### Batch endpoint logic (edge function)
 
-## Where IMDB vs TMDB ratings are used
+```typescript
+case "batch-imdb-ratings": {
+  // Parse POST body: { items: [{ tmdb_id, media_type }] }
+  // 1. Query cache table for all tmdb_ids
+  // 2. For cache misses:
+  //    a. Fetch TMDB detail to get imdb_id
+  //    b. Call OMDb for rating
+  //    c. Insert into cache
+  // 3. Return { ratings: { [tmdb_id]: { imdbRating, imdbId } } }
+}
+```
 
-| View | Rating Source | Reason |
-|------|-------------|--------|
-| Content detail page | IMDB (via OMDb) | Single item, worth the extra API call |
-| Browse grids/rows | TMDB | Too many items to fetch IMDB for each |
-| Actor filmography | TMDB | Too many items to fetch IMDB for each |
-| Search results | TMDB | Too many items to fetch IMDB for each |
+### Client-side merge and sort
 
-## Files summary
+```typescript
+// After TMDB data loads, fire batch request
+const imdbQuery = useQuery({
+  queryKey: ["imdb-batch", tmdbIds],
+  queryFn: () => tmdbService.getBatchIMDBRatings(items),
+  enabled: items.length > 0,
+  staleTime: DETAILS_STALE_TIME,
+});
+
+// Merge: overlay IMDb ratings onto WatchContent items
+// Sort: IMDb-rated first (desc), then TMDB-rated, then unrated
+```
+
+### Cache expiry
+
+Ratings older than 7 days are treated as stale and re-fetched. This keeps data fresh without excessive API calls.
+
+### Files summary
 
 | File | Change |
 |------|--------|
-| `supabase/functions/tmdb/index.ts` | Add `imdb-rating` endpoint using OMDb API |
-| `src/services/tmdbService.ts` | Add `imdb_id` to detail interfaces, add `getIMDBRating()` |
-| `src/data/watchContent.ts` | Add `imdbId` and `imdbRating` fields |
-| `src/services/tmdbTransformer.ts` | Pass through `imdbId` in detail transforms |
-| `src/hooks/useTMDB.ts` | Fetch IMDB rating in detail hooks |
-| `src/components/watch/ContentDetail.tsx` | Display IMDB rating with fallback to TMDB |
+| Database migration | Create `imdb_ratings_cache` table |
+| `supabase/functions/tmdb/index.ts` | Add `batch-imdb-ratings` POST endpoint with cache logic |
+| `src/services/tmdbService.ts` | Add `getBatchIMDBRatings()` method |
+| `src/hooks/useTMDB.ts` | Add IMDb batch fetch + merge + sort to all list hooks |
+| `src/components/content/MoviesContent.tsx` | Update featured hero selection to prefer high IMDb ratings |
+| `src/components/content/SeriesContent.tsx` | Same featured hero update |
 
