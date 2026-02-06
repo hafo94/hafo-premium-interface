@@ -43,13 +43,14 @@ const tvGenreMap: Record<number, string> = {
   37: "Western",
 };
 
-type ImageSize = "poster" | "poster_large" | "backdrop" | "backdrop_small";
+type ImageSize = "poster" | "poster_large" | "backdrop" | "backdrop_small" | "backdrop_thumb";
 
 const imageSizeMap: Record<ImageSize, string> = {
   poster: "w342",
   poster_large: "w500",
   backdrop: "w1280",
   backdrop_small: "w780",
+  backdrop_thumb: "w300",
 };
 
 const getImageUrl = (path: string | null, size: ImageSize = "poster"): string => {
@@ -79,6 +80,7 @@ export const transformTMDBMovie = (movie: TMDBMovie): WatchContent => ({
   poster: getImageUrl(movie.poster_path, "poster"),
   posterLarge: getImageUrl(movie.poster_path, "poster_large"),
   backdrop: getImageUrl(movie.backdrop_path, "backdrop"),
+  backdropSmall: getImageUrl(movie.backdrop_path, "backdrop_thumb"),
   isHot: movie.vote_average >= 7.5 && movie.vote_count > 1000,
   isRecommended: movie.popularity > 50,
   tmdbId: movie.id,
@@ -95,6 +97,7 @@ export const transformTMDBSeries = (series: TMDBSeries): WatchContent => ({
   poster: getImageUrl(series.poster_path, "poster"),
   posterLarge: getImageUrl(series.poster_path, "poster_large"),
   backdrop: getImageUrl(series.backdrop_path, "backdrop"),
+  backdropSmall: getImageUrl(series.backdrop_path, "backdrop_thumb"),
   isHot: series.vote_average >= 7.5 && series.vote_count > 500,
   isRecommended: series.popularity > 50,
   tmdbId: series.id,
@@ -120,6 +123,7 @@ export const transformTMDBSearchResult = (result: TMDBSearchResult): WatchConten
     poster: getImageUrl(result.poster_path, "poster"),
     posterLarge: getImageUrl(result.poster_path, "poster_large"),
     backdrop: getImageUrl(result.backdrop_path, "backdrop"),
+    backdropSmall: getImageUrl(result.backdrop_path, "backdrop_thumb"),
     isHot: (result.vote_average || 0) >= 7.5,
     isRecommended: result.popularity > 50,
     tmdbId: result.id,
@@ -138,6 +142,7 @@ export const transformTMDBMovieDetails = (movie: TMDBMovieDetails): WatchContent
   poster: getImageUrl(movie.poster_path, "poster"),
   posterLarge: getImageUrl(movie.poster_path, "poster_large"),
   backdrop: getImageUrl(movie.backdrop_path, "backdrop"),
+  backdropSmall: getImageUrl(movie.backdrop_path, "backdrop_thumb"),
   isHot: movie.vote_average >= 7.5 && movie.vote_count > 1000,
   isRecommended: movie.popularity > 50,
   tmdbId: movie.id,
@@ -158,6 +163,7 @@ export const transformTMDBSeriesDetails = (series: TMDBSeriesDetails): WatchCont
   poster: getImageUrl(series.poster_path, "poster"),
   posterLarge: getImageUrl(series.poster_path, "poster_large"),
   backdrop: getImageUrl(series.backdrop_path, "backdrop"),
+  backdropSmall: getImageUrl(series.backdrop_path, "backdrop_thumb"),
   isHot: series.vote_average >= 7.5 && series.vote_count > 500,
   isRecommended: series.popularity > 50,
   tmdbId: series.id,
