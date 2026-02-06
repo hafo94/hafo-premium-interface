@@ -373,19 +373,20 @@ export const usePersonCredits = (personId: number | undefined) => {
       
       const uniqueCredits = Array.from(creditMap.values());
       
-      // Sort: rated items first (by rating desc), then unrated (by popularity desc)
+      // Effective rating: ignore TMDB rating if < 20 votes (unreliable)
+      const getEffectiveRating = (item: WatchContent) => {
+        if (item.imdbRating) return item.imdbRating;
+        if ((item.voteCount || 0) >= 20) return item.rating || 0;
+        return 0; // Low-vote, no IMDb = bottom
+      };
+
       return uniqueCredits.sort((a, b) => {
-        const aRating = a.rating || 0;
-        const bRating = b.rating || 0;
-        const aHasRating = aRating > 0;
-        const bHasRating = bRating > 0;
+        const aRating = getEffectiveRating(a);
+        const bRating = getEffectiveRating(b);
 
-        if (aHasRating && !bHasRating) return -1;
-        if (!aHasRating && bHasRating) return 1;
-
-        if (aHasRating && bHasRating) {
-          if (bRating !== aRating) return bRating - aRating;
-        }
+        if (aRating > 0 && bRating === 0) return -1;
+        if (aRating === 0 && bRating > 0) return 1;
+        if (aRating > 0 && bRating > 0 && aRating !== bRating) return bRating - aRating;
 
         return (b.popularity || 0) - (a.popularity || 0);
       });

@@ -31,6 +31,7 @@ export interface WatchContent {
   progress?: number; // 0-100 percentage
   // TMDB-specific fields
   tmdbId?: number;
+  voteCount?: number;          // TMDB vote count for reliability filtering
   cast?: string[];
   director?: string;
   episodes?: number;
