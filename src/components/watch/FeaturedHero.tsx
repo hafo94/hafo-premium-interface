@@ -1,5 +1,5 @@
 import { Play, Plus, Check, Info, Star } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { WatchContent } from '@/data/watchContent';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +15,14 @@ interface FeaturedHeroProps {
 const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleList }: FeaturedHeroProps) => {
   const [focusedButton, setFocusedButton] = useState(0);
   const buttons = ['play', 'info', 'list'];
+  const heroRef = useRef<HTMLDivElement>(null);
+
+  // Scroll hero into view when focused via keyboard navigation
+  useEffect(() => {
+    if (isActive && heroRef.current) {
+      heroRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [isActive]);
 
   // Handle keyboard navigation when hero is active
   useEffect(() => {
@@ -44,7 +52,7 @@ const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleL
   }, [isActive, focusedButton, content, onSelect, onInfo, onToggleList]);
 
   return (
-    <div className="relative w-full h-[70vh] min-h-[500px] max-h-[700px]">
+    <div ref={heroRef} className="relative w-full h-[70vh] min-h-[500px] max-h-[700px]">
       {/* Backdrop Image */}
       <div className="absolute inset-0">
         <img

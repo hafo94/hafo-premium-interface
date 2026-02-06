@@ -27,6 +27,14 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
   const buttonRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   const isHeaderFocused = activeZone === "header";
+  const headerRef = useRef<HTMLElement>(null);
+
+  // Scroll header into view when focused via keyboard navigation
+  useEffect(() => {
+    if (isHeaderFocused && headerRef.current) {
+      headerRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [isHeaderFocused]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -126,7 +134,7 @@ const ModeHeader = ({ activeMode, onModeChange }: ModeHeaderProps) => {
   const activeColor = modes.find((m) => m.id === activeMode)?.color || "nipflix";
 
   return (
-    <header className="relative flex items-center justify-between px-8 py-5 z-50">
+    <header ref={headerRef} className="relative flex items-center justify-between px-8 py-5 z-50">
       {/* Left: Logo */}
       <h1 className="text-xl font-light tracking-[0.35em] text-gradient animate-breathe">
         hafo
