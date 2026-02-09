@@ -41,7 +41,7 @@ const StreamPlayer = ({
     setStatus('loading');
     setErrorMessage('');
 
-    const isHls = streamUrl.includes('.m3u8') || !streamUrl.match(/\.\w{2,4}$/);
+    const isHls = streamUrl.includes('.m3u8');
 
     if (isHls && Hls.isSupported()) {
       const hls = new Hls({
