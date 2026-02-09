@@ -5,6 +5,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
+const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
+
 interface IPTVRequest {
   serverUrl: string;
   username: string;
@@ -12,17 +14,90 @@ interface IPTVRequest {
   action: string;
   categoryId?: string;
   seriesId?: string;
+  streamUrl?: string; // For proxy_stream action
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const { serverUrl, username, password, action, categoryId, seriesId }: IPTVRequest = await req.json();
+  // Handle GET requests for stream proxying (video element uses GET)
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    const streamUrl = url.searchParams.get('streamUrl');
+    
+    if (!streamUrl) {
+      return new Response('Missing streamUrl parameter', { status: 400, headers: corsHeaders });
+    }
 
+    console.log(`IPTV proxy_stream (GET): ${streamUrl.substring(0, 80)}...`);
+
+    try {
+      const videoResponse = await fetch(streamUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      });
+
+      if (!videoResponse.ok) {
+        return new Response(`Stream fetch failed: ${videoResponse.status}`, {
+          status: videoResponse.status,
+          headers: corsHeaders,
+        });
+      }
+
+      const contentType = videoResponse.headers.get('Content-Type') || 'video/mp4';
+      const contentLength = videoResponse.headers.get('Content-Length');
+      const responseHeaders: Record<string, string> = { ...corsHeaders, 'Content-Type': contentType };
+      if (contentLength) responseHeaders['Content-Length'] = contentLength;
+
+      return new Response(videoResponse.body, { headers: responseHeaders });
+    } catch (error) {
+      console.error('Stream proxy error:', error);
+      return new Response('Stream proxy error', { status: 502, headers: corsHeaders });
+    }
+  }
+
+  try {
+    const { serverUrl, username, password, action, categoryId, seriesId, streamUrl }: IPTVRequest = await req.json();
+
+    // Handle proxy_stream action — streams video data through HTTPS
+    if (action === 'proxy_stream') {
+      if (!streamUrl) {
+        return new Response(
+          JSON.stringify({ error: 'Missing streamUrl for proxy_stream' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`IPTV proxy_stream: ${streamUrl.substring(0, 80)}...`);
+
+      const videoResponse = await fetch(streamUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      });
+
+      if (!videoResponse.ok) {
+        return new Response(
+          JSON.stringify({ error: `Stream fetch failed: ${videoResponse.status}` }),
+          { status: videoResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const contentType = videoResponse.headers.get('Content-Type') || 'video/mp4';
+      const contentLength = videoResponse.headers.get('Content-Length');
+
+      const responseHeaders: Record<string, string> = {
+        ...corsHeaders,
+        'Content-Type': contentType,
+      };
+      if (contentLength) {
+        responseHeaders['Content-Length'] = contentLength;
+      }
+
+      // Stream the video body directly — no buffering
+      return new Response(videoResponse.body, { headers: responseHeaders });
+    }
+
+    // Regular API actions
     if (!serverUrl || !username || !password || !action) {
       return new Response(
         JSON.stringify({ error: 'Missing required parameters: serverUrl, username, password, action' }),
@@ -30,11 +105,9 @@ serve(async (req) => {
       );
     }
 
-    // Build the Xtream Codes API URL
-    const baseUrl = serverUrl.replace(/\/$/, ''); // Remove trailing slash
+    const baseUrl = serverUrl.replace(/\/$/, '');
     let apiUrl = `${baseUrl}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=${action}`;
 
-    // Add optional parameters
     if (categoryId) {
       apiUrl += `&category_id=${encodeURIComponent(categoryId)}`;
     }
@@ -44,13 +117,31 @@ serve(async (req) => {
 
     console.log(`IPTV API Request: action=${action}, categoryId=${categoryId || 'none'}, seriesId=${seriesId || 'none'}`);
 
-    // Make the request to the IPTV provider
-    const response = await fetch(apiUrl, {
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    });
+    // Add timeout to upstream fetch
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000);
+
+    let response: Response;
+    try {
+      response = await fetch(apiUrl, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      });
+    } catch (fetchError) {
+      clearTimeout(timeout);
+      if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+        console.error(`IPTV API Timeout: action=${action}`);
+        return new Response(
+          JSON.stringify([]),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw fetchError;
+    }
+    clearTimeout(timeout);
 
     if (!response.ok) {
       console.error(`IPTV API Error: ${response.status} ${response.statusText}`);
@@ -65,10 +156,10 @@ serve(async (req) => {
       const data = await response.json();
       if (data.user_info && data.user_info.auth === 1) {
         return new Response(
-          JSON.stringify({ 
-            success: true, 
+          JSON.stringify({
+            success: true,
             user_info: data.user_info,
-            server_info: data.server_info 
+            server_info: data.server_info,
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
@@ -80,8 +171,19 @@ serve(async (req) => {
       }
     }
 
-    // For large responses (streams lists), pass through the body directly without buffering
-    return new Response(response.body, {
+    // Read body as text (not stream) to avoid connection-closed crashes
+    const text = await response.text();
+
+    // If response is too large, return empty array to avoid CORS crashes
+    if (text.length > MAX_RESPONSE_SIZE) {
+      console.warn(`IPTV response too large (${(text.length / 1024 / 1024).toFixed(1)}MB) for action=${action}, returning empty array`);
+      return new Response(
+        JSON.stringify([]),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    return new Response(text, {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
