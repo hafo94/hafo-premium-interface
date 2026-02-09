@@ -125,7 +125,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
 
       <div className="relative w-full max-w-3xl mx-4 max-h-[90vh] flex flex-col bg-card rounded-lg overflow-hidden shadow-2xl animate-fade-in-scale">
         {/* Hero Backdrop */}
-        <div className="relative aspect-video flex-shrink-0">
+        <div className="relative h-[300px] flex-shrink-0">
           <img src={content.posterLarge || content.backdrop} alt="" className="w-full h-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
 
