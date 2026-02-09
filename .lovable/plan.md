@@ -1,101 +1,111 @@
 
 
-# IPTV Library Integration -- Show Only Streamable Titles
+# Fix IPTV Integration: Title Matching and Loading UX
 
-## Overview
+## Root Cause Analysis
 
-Hardcode the IPTV credentials, fetch the full VOD (movies) and Series library from the IPTV server, then cross-reference every TMDB title with the IPTV catalog. Only titles that exist on the IPTV server will be displayed. Clicking "Play" will stream directly from the IPTV provider.
+Two issues are causing the blank screen:
 
-## How It Works
+1. **UI blocked during load**: `iptvLoading` is included in the loading check, showing a skeleton for the entire duration of catalog fetching (potentially minutes with hundreds of categories). No content is visible during this time.
 
-1. **Hardcode credentials** in the IPTVContext so it auto-connects without needing the Settings flow.
+2. **Title matching never succeeds**: IPTV titles contain language/country prefixes like `"IN| TAMIL| Champion"`, `"US| EN| The Dark Knight"`. The current `normalizeTitle` only strips punctuation -- it doesn't remove these prefixes. So TMDB's `"champion"` never matches IPTV's `"in tamil champion"`.
 
-2. **Fetch IPTV catalogs on startup** -- the full VOD streams list and full Series list (no category filter = all titles). Cache these in React Query.
+## Solution
 
-3. **Title matching** -- create a utility hook (`useIPTVLibrary`) that:
-   - Loads all VOD streams and all Series from IPTV
-   - Builds a lookup map by normalized title (lowercase, stripped of special characters)
-   - Exposes a `filterByIPTV(items: WatchContent[])` function that filters a TMDB content array to only include titles found in the IPTV catalog
-   - Attaches `streamUrl`, `iptvId`, and `containerExtension` to each matched item
+### Part 1: Fix Title Normalization (`src/hooks/useIPTVLibrary.ts`)
 
-4. **Apply the filter** in `MoviesContent` and `SeriesContent` -- wrap every content array (trending, popular, top rated, grid items, etc.) through the IPTV filter before rendering. This means only titles available on the IPTV server appear.
+Strip common IPTV prefixes before matching. IPTV providers use patterns like:
+- `"US| EN| Title"` or `"IN| TAMIL| Title"`
+- `"[EN] Title"` or `"(HD) Title"`
+- `"Title (2021)"` (year suffixes)
 
-5. **Play button works** -- since each matched `WatchContent` item now has a `streamUrl`, the existing `ContentDetail` -> `StreamPlayer` flow will stream it.
+Update `normalizeTitle` to handle these, AND store **multiple lookup keys** per IPTV title (both the full cleaned name and the portion after the last `|` delimiter).
 
-## Changes
+### Part 2: Don't Block UI (`src/components/content/MoviesContent.tsx` and `SeriesContent.tsx`)
 
-### 1. IPTVContext -- Hardcode Credentials
+- Remove `iptvLoading` from the loading check -- show TMDB content immediately
+- When IPTV is still loading, show all TMDB content (unfiltered) so the page isn't blank
+- Once IPTV loads, filter down to only matched titles
+- Add a subtle indicator (e.g., small loading spinner in the corner) while IPTV catalog syncs in background
 
-Set the default credentials to:
-- Server: `http://freeiptv.ottc.xyz:80`
-- Username: `850832714335`
-- Password: `641859008374`
+### Part 3: Smarter Matching (`src/hooks/useIPTVLibrary.ts`)
 
-Auto-mark as connected on mount (skip manual test).
-
-### 2. New Hook: `useIPTVLibrary`
-
-Create `src/hooks/useIPTVLibrary.ts`:
-
-- Fetches all VOD streams (`get_vod_streams` with no category)
-- Fetches all Series (`get_series` with no category)
-- Builds a normalized title -> IPTV stream map
-- Provides `enrichWithIPTV(items: WatchContent[]): WatchContent[]` that:
-  - Matches by normalized title
-  - Attaches `streamUrl` (using `buildVodStreamUrl` or `buildSeriesStreamUrl`)
-  - Attaches `iptvId` and `containerExtension`
-- Provides `filterByIPTV(items: WatchContent[]): WatchContent[]` that returns only matched items
-- Exposes loading state
-
-### 3. MoviesContent -- Filter Through IPTV
-
-- Import `useIPTVLibrary`
-- Wrap all content arrays through `filterByIPTV` before rendering
-- Show a loading indicator while the IPTV library is loading
-- Featured hero picks from filtered content only
-
-### 4. SeriesContent -- Filter Through IPTV
-
-Same approach as MoviesContent.
-
-### 5. ContentDetail -- Use Stream URL
-
-Already mostly done. When `content.streamUrl` is set (from IPTV matching), clicking Play opens StreamPlayer with that URL. No changes needed here since the previous work already wired this up.
+Instead of exact match only, also try:
+- Substring match: if the IPTV title **contains** the TMDB title
+- This catches `"US| EN| The Dark Knight"` matching TMDB's `"The Dark Knight"`
 
 ## Technical Details
 
-### Title Normalization
+### File: `src/hooks/useIPTVLibrary.ts`
+
+**Change 1 -- Better title extraction**:
 
 ```typescript
-function normalizeTitle(title: string): string {
-  return title
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')  // Remove special chars
-    .replace(/\s+/g, ' ')          // Collapse whitespace
-    .trim();
+function extractCleanTitle(rawTitle: string): string[] {
+  // Split by | and take the last segment (the actual title)
+  const parts = rawTitle.split('|');
+  const lastPart = parts[parts.length - 1].trim();
+  
+  // Also try without year suffix: "Title (2021)" -> "Title"
+  const withoutYear = lastPart.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+  
+  const normalized = normalizeTitle(lastPart);
+  const normalizedNoYear = normalizeTitle(withoutYear);
+  
+  const keys = [normalized];
+  if (normalizedNoYear !== normalized) keys.push(normalizedNoYear);
+  
+  // Also add the full raw normalized (for titles without prefixes)
+  const fullNormalized = normalizeTitle(rawTitle);
+  if (fullNormalized !== normalized) keys.push(fullNormalized);
+  
+  return keys;
 }
 ```
 
-This handles cases like "The Dark Knight" vs "the dark knight" or slight punctuation differences.
+**Change 2 -- Build map with multiple keys per title**:
 
-### Stream URL Construction
+When building `vodMap` and `seriesMap`, insert each stream under ALL its extracted keys. This way `"The Dark Knight"` can be found whether the IPTV title is `"The Dark Knight"`, `"US| EN| The Dark Knight"`, or `"The Dark Knight (2008)"`.
 
-For movies (VOD):
+**Change 3 -- Update `filterByIPTV` to not block when loading**:
+
+```typescript
+// When IPTV is still loading, return items unfiltered (show everything)
+// When IPTV is ready but no matches, return empty (hide non-available)
+const filterByIPTV = (items: WatchContent[]): WatchContent[] => {
+  if (!iptvCredentials || isLoading) return items; // Show all while loading
+  const enriched = enrichWithIPTV(items);
+  return enriched.filter((item) => !!item.iptvId);
+};
 ```
-http://server/movie/username/password/streamId.mp4
+
+This part already works correctly -- the issue is just that movies/series content components include `iptvLoading` in their own loading check.
+
+### File: `src/components/content/MoviesContent.tsx`
+
+**Change -- Remove IPTV from loading gate (line 346)**:
+
+```typescript
+// BEFORE:
+const isLoading = iptvLoading || (isGridView ? ... : homeLoading);
+
+// AFTER:
+const isLoading = isGridView
+  ? (activeSection === "popular" && popularLoading) || ...
+  : homeLoading;
 ```
 
-For series (first episode as default):
-```
-http://server/series/username/password/episodeId.mp4
-```
+Remove `iptvLoading` so TMDB content shows immediately. The `filterByIPTV` function already handles the loading state internally by returning all items while IPTV is loading.
 
-### Files Changed
+### File: `src/components/content/SeriesContent.tsx`
 
-| File | Action | Description |
-|------|--------|-------------|
-| `src/contexts/IPTVContext.tsx` | Modify | Hardcode credentials, auto-connect |
-| `src/hooks/useIPTVLibrary.ts` | Create | IPTV catalog fetching + title matching + filtering |
-| `src/components/content/MoviesContent.tsx` | Modify | Filter all content through IPTV library |
-| `src/components/content/SeriesContent.tsx` | Modify | Filter all content through IPTV library |
+Same change -- remove `iptvLoading` from the loading check.
+
+## Summary of Changes
+
+| File | Change |
+|------|--------|
+| `src/hooks/useIPTVLibrary.ts` | Fix title normalization to strip IPTV prefixes; build multi-key lookup maps |
+| `src/components/content/MoviesContent.tsx` | Remove `iptvLoading` from loading gate so content shows immediately |
+| `src/components/content/SeriesContent.tsx` | Same as above |
 
