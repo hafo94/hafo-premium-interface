@@ -24,9 +24,15 @@ const IPTVContext = createContext<IPTVContextType | undefined>(undefined);
 const IPTV_STORAGE_KEY = 'iptv_credentials';
 const KODI_STORAGE_KEY = 'kodi_config';
 
+const DEFAULT_IPTV_CREDENTIALS: IPTVCredentials = {
+  serverUrl: 'http://freeiptv.ottc.xyz:80',
+  username: '850832714335',
+  password: '641859008374',
+};
+
 export function IPTVProvider({ children }: { children: React.ReactNode }) {
-  const [iptvCredentials, setIPTVCredentialsState] = useState<IPTVCredentials | null>(null);
-  const [iptvConnected, setIPTVConnected] = useState(false);
+  const [iptvCredentials, setIPTVCredentialsState] = useState<IPTVCredentials | null>(DEFAULT_IPTV_CREDENTIALS);
+  const [iptvConnected, setIPTVConnected] = useState(true);
   const [kodiConfig, setKodiConfigState] = useState<KodiConfig | null>(null);
   const [kodiConnected, setKodiConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

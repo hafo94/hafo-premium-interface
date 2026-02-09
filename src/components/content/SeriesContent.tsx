@@ -12,6 +12,7 @@ import { useIMDBSortedContent, selectFeaturedItems } from "@/hooks/useIMDBRating
 import { useInfinitePopularSeries, useInfiniteOnTheAirSeries, useInfiniteSeriesByGenre } from "@/hooks/useInfiniteContent";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSeriesGenreLabel } from "@/data/genreConfig";
+import { useIPTVLibrary } from "@/hooks/useIPTVLibrary";
 
 interface SeriesContentProps {
   activeSection: string;
@@ -22,6 +23,7 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
   const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
   const gridColumns = useGridColumns2();
+  const { filterByIPTV, isLoading: iptvLoading } = useIPTVLibrary();
 
   // Determine if viewing grid mode
   const isGenreSelected = activeSection.startsWith("genre-");
@@ -32,10 +34,16 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
   const { trendingSeries: rawTrending, isLoading: homeLoading, error: homeError, popularSeries: rawPopular, topRatedSeries: rawTopRated, onTheAir: rawOnTheAir } = useSeriesPageData();
 
   // Sort each row by IMDb ratings
-  const trendingSeries = useIMDBSortedContent(rawTrending, "trending-series");
-  const popularSeries = useIMDBSortedContent(rawPopular, "popular-series");
-  const topRatedSeries = useIMDBSortedContent(rawTopRated, "top-rated-series");
-  const onTheAir = useIMDBSortedContent(rawOnTheAir, "on-the-air-series");
+  const trendingSeriesRaw = useIMDBSortedContent(rawTrending, "trending-series");
+  const popularSeriesRaw = useIMDBSortedContent(rawPopular, "popular-series");
+  const topRatedSeriesRaw = useIMDBSortedContent(rawTopRated, "top-rated-series");
+  const onTheAirRaw = useIMDBSortedContent(rawOnTheAir, "on-the-air-series");
+
+  // Filter through IPTV library
+  const trendingSeries = useMemo(() => filterByIPTV(trendingSeriesRaw), [filterByIPTV, trendingSeriesRaw]);
+  const popularSeries = useMemo(() => filterByIPTV(popularSeriesRaw), [filterByIPTV, popularSeriesRaw]);
+  const topRatedSeries = useMemo(() => filterByIPTV(topRatedSeriesRaw), [filterByIPTV, topRatedSeriesRaw]);
+  const onTheAir = useMemo(() => filterByIPTV(onTheAirRaw), [filterByIPTV, onTheAirRaw]);
 
   // Infinite queries for grid views
   const { 
@@ -62,19 +70,18 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
     isLoading: genreLoading 
   } = useInfiniteSeriesByGenre(selectedGenreId);
 
-  // Flatten infinite query pages
+  // Flatten infinite query pages and filter through IPTV
   const gridItems = useMemo(() => {
+    let items: WatchContent[] = [];
     if (activeSection === "popular" && popularData) {
-      return popularData.pages.flatMap((page) => page.items);
+      items = popularData.pages.flatMap((page) => page.items);
+    } else if (activeSection === "on-air" && onAirData) {
+      items = onAirData.pages.flatMap((page) => page.items);
+    } else if (isGenreSelected && genreData) {
+      items = genreData.pages.flatMap((page) => page.items);
     }
-    if (activeSection === "on-air" && onAirData) {
-      return onAirData.pages.flatMap((page) => page.items);
-    }
-    if (isGenreSelected && genreData) {
-      return genreData.pages.flatMap((page) => page.items);
-    }
-    return [];
-  }, [activeSection, popularData, onAirData, genreData, isGenreSelected]);
+    return filterByIPTV(items);
+  }, [activeSection, popularData, onAirData, genreData, isGenreSelected, filterByIPTV]);
 
   // Grid view props
   const gridProps = useMemo(() => {
@@ -335,11 +342,11 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
   );
 
   // Determine loading state
-  const isLoading = isGridView
+  const isLoading = iptvLoading || (isGridView
     ? (activeSection === "popular" && popularLoading) ||
       (activeSection === "on-air" && onAirLoading) ||
       (isGenreSelected && genreLoading)
-    : homeLoading;
+    : homeLoading);
   const error = homeError;
 
   // Get section title
