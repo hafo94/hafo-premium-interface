@@ -1,128 +1,69 @@
 
 
-# Browser-Based IPTV Playback (No Kodi)
+# Content Detail Popup with In-Browser Playback
 
 ## Overview
 
-Replace the headless Kodi playback model with a fully in-browser media player. The app will use the existing IPTV credentials (Xtream Codes API) to fetch live channels, VOD, and series -- then play streams directly in an HTML5 video element using HLS.js.
+Update the existing `ContentDetail` modal to show enriched movie/series info (header image, runtime, rating, description, year, up to 3 actors) and replace the Kodi-based "Play" button with an in-browser `StreamPlayer` that opens fullscreen within the modal.
 
-## What Changes
+## Changes
 
-### 1. Add HLS.js Dependency
+### 1. Update ContentDetail Modal (`src/components/watch/ContentDetail.tsx`)
 
-Install `hls.js` -- a JavaScript library that enables HLS (HTTP Live Streaming) playback in browsers. Most IPTV providers serve streams in HLS format, and this library handles the protocol natively in any modern browser.
+The modal already exists and shows most required info. Changes needed:
 
-### 2. New Component: `StreamPlayer`
+- **Show actors**: The `cast` field is already fetched from TMDB details (up to 5 names). Display the first 3 actors in the metadata section as "Cast: Actor 1, Actor 2, Actor 3"
+- **Show director** (for movies): Already available in `enrichedContent.director`
+- **Replace Kodi playback with StreamPlayer**: Remove the Kodi dependency. When "Play" is pressed, show the `StreamPlayer` component fullscreen inside the modal (or as a fullscreen overlay). The stream URL comes from `content.streamUrl` (for IPTV content) or shows a "No stream available" message for TMDB-only content
+- **Keep existing info**: Backdrop header image, title, year, runtime, rating (IMDb when available), genres, description, seasons/episodes, "More Like This"
 
-Create `src/components/player/StreamPlayer.tsx` -- a reusable in-browser video player that:
+### 2. Add Fullscreen Player State to ContentDetail
 
-- Accepts a stream URL (built from IPTV credentials + stream ID)
-- Uses HLS.js to load and play `.m3u8` streams
-- Falls back to native `<video>` for `.mp4` / `.ts` direct URLs
-- Provides controls: play/pause, volume, mute, fullscreen, progress bar
-- Shows loading/buffering states and error handling
-- Supports keyboard shortcuts (Space, M, F, Escape) matching the current TVPlayer UX
-- Displays channel info overlay that auto-hides after 4 seconds (same pattern as current TVPlayer)
+When the user clicks "Play":
+- If `content.streamUrl` exists, transition the modal into a fullscreen player view using `StreamPlayer`
+- Show a back button to return to the detail view
+- Keyboard: Escape exits fullscreen player back to detail view, then Escape again closes the modal
 
-### 3. Rewire the TV Page to Use Real IPTV Data
+### 3. Ensure All Click Points Open ContentDetail
 
-Currently `src/pages/TV.tsx` uses hardcoded channels from `src/data/tvChannels.ts`. We will:
+Currently, clicking items in content rows and search results already calls `setSelectedContent()` which opens the modal. The hero's "Play" button also calls `onSelect(content)`. Verify all paths lead to the same `ContentDetail` popup:
 
-- Replace the hardcoded channel list with data from the `useLiveCategories()` and `useLiveStreams()` hooks (already built in `src/hooks/useIPTV.ts`)
-- Map `IPTVLiveStream` data to a format the `LiveTVHome` component can display
-- When a channel is selected, build the stream URL using `buildLiveStreamUrl()` from `iptvService.ts` and pass it to the new `StreamPlayer`
-- Show a "Connect IPTV" prompt if no credentials are configured, linking to Settings
+- **Hero "Play" button** -- currently calls `onSelect` which opens ContentDetail (already works)
+- **Hero "More Info" button** -- calls `onInfo` which also opens ContentDetail (already works)
+- **Content row items** -- calls `onItemSelect` -> `setSelectedContent` (already works)
+- **Search results** -- calls `onSelect` -> `setSelectedContent` (already works)
 
-### 4. Update TVPlayer to Use StreamPlayer
-
-Replace the current placeholder gradient background in `TVPlayer` with the actual `StreamPlayer` component:
-
-- Pass `buildLiveStreamUrl(credentials, channel.stream_id)` as the stream source
-- Keep all existing overlay UI (back button, channel info, progress bar, controls)
-- Wire play/pause/mute/volume controls to the actual video element
-- Channel switching (PageUp/PageDown) rebuilds the stream URL and loads the new channel
-
-### 5. Settings Flow Verification
-
-The IPTV settings (`src/components/settings/IPTVSettings.tsx`) already:
-- Accepts server URL, username, password
-- Saves to localStorage via `IPTVContext`
-- Has a "Test Connection" button that calls the `iptv` edge function
-
-We will verify this works by:
-- Ensuring the edge function proxy correctly forwards the `get_user_info` action
-- Confirming that after a successful test, `iptvConnected` is set to `true`
-- Making the TV page reactive to connection state changes
-
-### 6. Remove Kodi Tab from Settings (Optional)
-
-Since this remix is browser-only, the Kodi settings tab can be hidden or removed from the Settings modal. The Kodi service code can remain but won't be used.
-
-## File Changes Summary
-
-| File | Action | Description |
-|------|--------|-------------|
-| `package.json` | Modify | Add `hls.js` dependency |
-| `src/components/player/StreamPlayer.tsx` | Create | New HLS-capable video player component |
-| `src/components/tv/TVPlayer.tsx` | Modify | Replace placeholder with StreamPlayer, wire real controls |
-| `src/components/tv/LiveTVHome.tsx` | Modify | Use IPTV hooks instead of hardcoded tvChannels |
-| `src/pages/TV.tsx` | Modify | Use IPTV data, show connect prompt if no credentials |
-| `src/components/SettingsModal.tsx` | Modify | Remove Kodi tab (browser-only version) |
+No routing changes needed -- all paths already converge on the `ContentDetail` modal.
 
 ## Technical Details
 
-### HLS.js Integration Pattern
-
-```typescript
-import Hls from 'hls.js';
-
-// In StreamPlayer component:
-useEffect(() => {
-  if (!videoRef.current || !streamUrl) return;
-
-  if (streamUrl.includes('.m3u8') && Hls.isSupported()) {
-    const hls = new Hls({ enableWorker: true, lowLatencyMode: true });
-    hls.loadSource(streamUrl);
-    hls.attachMedia(videoRef.current);
-    hls.on(Hls.Events.MANIFEST_PARSED, () => videoRef.current?.play());
-    return () => hls.destroy();
-  } else {
-    // Direct URL (mp4, ts) -- native playback
-    videoRef.current.src = streamUrl;
-    videoRef.current.play();
-  }
-}, [streamUrl]);
+### Cast Display (in metadata section)
 ```
-
-### Stream URL Construction
-
-IPTV streams from Xtream Codes use these URL patterns (already defined in `iptvService.ts`):
-- Live: `http://server/username/password/streamId` (usually outputs HLS or TS)
-- VOD: `http://server/movie/username/password/streamId.mp4`
-- Series: `http://server/series/username/password/streamId.mp4`
-
-The edge function proxy is NOT needed for stream playback -- only for API calls. The video element loads the stream URL directly from the IPTV provider.
-
-### IPTV Data Mapping
-
-Map `IPTVLiveStream` to a display-friendly format:
-
-```typescript
-interface BrowserChannel {
-  id: number;          // stream_id
-  name: string;        // name
-  icon: string;        // stream_icon
-  category: string;    // category_id
-  streamUrl: string;   // built from buildLiveStreamUrl()
-  epgId: string;       // epg_channel_id
-  hasArchive: boolean; // tv_archive > 0
-}
+Cast: Tom Hardy, Charlize Theron, Nicholas Hoult
 ```
+Uses `enrichedContent.cast?.slice(0, 3).join(', ')` -- data already available from TMDB details fetch.
 
-### Error States to Handle
+### Player Integration
+Replace the Kodi `handlePlay` function with a state toggle:
+- `isPlayerOpen` state: when true, render `StreamPlayer` as a fullscreen overlay inside the modal
+- Stream URL: use `content.streamUrl` directly (no proxy needed for playback)
+- Controls: Space (play/pause), M (mute), F (fullscreen), Escape (back to detail)
 
-- No IPTV credentials configured: show "Connect your IPTV service in Settings"
-- IPTV connected but stream fails to load: show error with retry button
-- HLS.js not supported (rare): show message suggesting a compatible browser
-- Network error during playback: auto-retry with exponential backoff (HLS.js handles this)
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `src/components/watch/ContentDetail.tsx` | Add cast/director display, replace Kodi with StreamPlayer, add fullscreen player state |
+
+### What the Popup Will Show
+
+1. **Header**: Full-width backdrop image with gradient overlay
+2. **Title**: Large title text with type badge (FILM / SERIES)
+3. **Metadata row**: Year, Runtime (formatted), Rating (IMDb preferred), HD badge
+4. **Cast**: "Cast: Actor 1, Actor 2, Actor 3" (max 3)
+5. **Director**: "Director: Name" (movies only)
+6. **Description**: Plot text
+7. **Action buttons**: Play, Add to List, Like, Mute
+8. **Seasons/Episodes**: For series (existing)
+9. **More Like This**: TMDB recommendations (existing)
 
