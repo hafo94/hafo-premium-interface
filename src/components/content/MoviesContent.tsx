@@ -12,6 +12,8 @@ import { useIMDBSortedContent, selectFeaturedItems } from "@/hooks/useIMDBRating
 import { useInfinitePopularMovies, useInfiniteNowPlayingMovies, useInfiniteMoviesByGenre } from "@/hooks/useInfiniteContent";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMovieGenreLabel } from "@/data/genreConfig";
+import { useIPTVLibrary } from "@/hooks/useIPTVLibrary";
+import { Loader2 } from "lucide-react";
 
 interface MoviesContentProps {
   activeSection: string;
@@ -22,6 +24,7 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
   const gridColumns = useGridColumns2();
+  const { filterByIPTV, isLoading: iptvLoading, isReady: iptvReady } = useIPTVLibrary();
 
   // Determine if viewing grid mode
   const isGenreSelected = activeSection.startsWith("genre-");
@@ -32,10 +35,16 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   const { trendingMovies: rawTrending, isLoading: homeLoading, error: homeError, popularMovies: rawPopular, topRatedMovies: rawTopRated, nowPlaying: rawNowPlaying } = useMoviesPageData();
 
   // Sort each row by IMDb ratings
-  const trendingMovies = useIMDBSortedContent(rawTrending, "trending-movies");
-  const popularMovies = useIMDBSortedContent(rawPopular, "popular-movies");
-  const topRatedMovies = useIMDBSortedContent(rawTopRated, "top-rated-movies");
-  const nowPlaying = useIMDBSortedContent(rawNowPlaying, "now-playing-movies");
+  const trendingMoviesRaw = useIMDBSortedContent(rawTrending, "trending-movies");
+  const popularMoviesRaw = useIMDBSortedContent(rawPopular, "popular-movies");
+  const topRatedMoviesRaw = useIMDBSortedContent(rawTopRated, "top-rated-movies");
+  const nowPlayingRaw = useIMDBSortedContent(rawNowPlaying, "now-playing-movies");
+
+  // Filter through IPTV library
+  const trendingMovies = useMemo(() => filterByIPTV(trendingMoviesRaw), [filterByIPTV, trendingMoviesRaw]);
+  const popularMovies = useMemo(() => filterByIPTV(popularMoviesRaw), [filterByIPTV, popularMoviesRaw]);
+  const topRatedMovies = useMemo(() => filterByIPTV(topRatedMoviesRaw), [filterByIPTV, topRatedMoviesRaw]);
+  const nowPlaying = useMemo(() => filterByIPTV(nowPlayingRaw), [filterByIPTV, nowPlayingRaw]);
 
   // Infinite queries for grid views
   const { 
@@ -62,19 +71,18 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     isLoading: genreLoading 
   } = useInfiniteMoviesByGenre(selectedGenreId);
 
-  // Flatten infinite query pages
+  // Flatten infinite query pages and filter through IPTV
   const gridItems = useMemo(() => {
+    let items: WatchContent[] = [];
     if (activeSection === "popular" && popularData) {
-      return popularData.pages.flatMap((page) => page.items);
+      items = popularData.pages.flatMap((page) => page.items);
+    } else if (activeSection === "cinema" && cinemaData) {
+      items = cinemaData.pages.flatMap((page) => page.items);
+    } else if (isGenreSelected && genreData) {
+      items = genreData.pages.flatMap((page) => page.items);
     }
-    if (activeSection === "cinema" && cinemaData) {
-      return cinemaData.pages.flatMap((page) => page.items);
-    }
-    if (isGenreSelected && genreData) {
-      return genreData.pages.flatMap((page) => page.items);
-    }
-    return [];
-  }, [activeSection, popularData, cinemaData, genreData, isGenreSelected]);
+    return filterByIPTV(items);
+  }, [activeSection, popularData, cinemaData, genreData, isGenreSelected, filterByIPTV]);
 
   // Grid view props
   const gridProps = useMemo(() => {
@@ -335,11 +343,11 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
   );
 
   // Determine loading state
-  const isLoading = isGridView
+  const isLoading = iptvLoading || (isGridView
     ? (activeSection === "popular" && popularLoading) ||
       (activeSection === "cinema" && cinemaLoading) ||
       (isGenreSelected && genreLoading)
-    : homeLoading;
+    : homeLoading);
   const error = homeError;
 
   // Get section title
