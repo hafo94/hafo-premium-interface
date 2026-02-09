@@ -117,7 +117,22 @@ export function useIPTVLibrary() {
         map.set(key, stream);
       }
     }
-    console.log(`[IPTV Library] VOD map built: ${vodStreams.length} streams → ${map.size} keys`);
+    console.log(`[IPTV Library] VOD map built: ${vodStreams.length} streams → ${map.size} title keys`);
+    return map;
+  }, [vodStreams]);
+
+  const vodByTmdbId = useMemo(() => {
+    const map = new Map<string, IPTVVodStream>();
+    if (!vodStreams) return map;
+    for (const stream of vodStreams) {
+      if (stream.tmdb_id && stream.tmdb_id !== '0') {
+        map.set(String(stream.tmdb_id), stream);
+      }
+      if (stream.tmdb && stream.tmdb !== '0') {
+        map.set(String(stream.tmdb), stream);
+      }
+    }
+    console.log(`[IPTV Library] VOD TMDB ID map built: ${map.size} entries`);
     return map;
   }, [vodStreams]);
 
@@ -130,7 +145,19 @@ export function useIPTVLibrary() {
         map.set(key, series);
       }
     }
-    console.log(`[IPTV Library] Series map built: ${seriesList.length} series → ${map.size} keys`);
+    console.log(`[IPTV Library] Series map built: ${seriesList.length} series → ${map.size} title keys`);
+    return map;
+  }, [seriesList]);
+
+  const seriesByTmdbId = useMemo(() => {
+    const map = new Map<string, IPTVSeriesInfo>();
+    if (!seriesList) return map;
+    for (const series of seriesList) {
+      if (series.tmdb_id && series.tmdb_id !== '0') {
+        map.set(String(series.tmdb_id), series);
+      }
+    }
+    console.log(`[IPTV Library] Series TMDB ID map built: ${map.size} entries`);
     return map;
   }, [seriesList]);
 
@@ -138,11 +165,15 @@ export function useIPTVLibrary() {
     return (items: WatchContent[]): WatchContent[] => {
       if (!iptvCredentials) return items;
 
-      return items.map((item) => {
-        const normalized = normalizeTitle(item.title);
+      let byId = 0, byTitle = 0, unmatched = 0;
 
+      const result = items.map((item) => {
         if (item.type === 'movie') {
-          const vod = vodMap.get(normalized);
+          let vod = item.tmdbId ? vodByTmdbId.get(String(item.tmdbId)) : undefined;
+          if (vod) { byId++; } else {
+            vod = vodMap.get(normalizeTitle(item.title));
+            if (vod) byTitle++;
+          }
           if (vod) {
             return {
               ...item,
@@ -152,7 +183,11 @@ export function useIPTVLibrary() {
             };
           }
         } else {
-          const series = seriesMap.get(normalized);
+          let series = item.tmdbId ? seriesByTmdbId.get(String(item.tmdbId)) : undefined;
+          if (series) { byId++; } else {
+            series = seriesMap.get(normalizeTitle(item.title));
+            if (series) byTitle++;
+          }
           if (series) {
             return {
               ...item,
@@ -163,10 +198,14 @@ export function useIPTVLibrary() {
           }
         }
 
+        unmatched++;
         return item;
       });
+
+      console.log(`[IPTV Library] Enriched ${items.length} items: ${byId} by TMDB ID, ${byTitle} by title, ${unmatched} unmatched`);
+      return result;
     };
-  }, [iptvCredentials, vodMap, seriesMap]);
+  }, [iptvCredentials, vodMap, seriesMap, vodByTmdbId, seriesByTmdbId]);
 
   const filterByIPTV = useMemo(() => {
     return (items: WatchContent[]): WatchContent[] => {
