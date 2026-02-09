@@ -110,21 +110,35 @@ export interface IPTVLiveStream {
 
 // API functions
 async function callIPTVProxy(credentials: IPTVCredentials, action: string, params: Record<string, string> = {}) {
-  const { data, error } = await supabase.functions.invoke('iptv', {
-    body: {
-      serverUrl: credentials.serverUrl,
-      username: credentials.username,
-      password: credentials.password,
-      action,
-      ...params,
-    },
-  });
+  try {
+    const { data, error } = await supabase.functions.invoke('iptv', {
+      body: {
+        serverUrl: credentials.serverUrl,
+        username: credentials.username,
+        password: credentials.password,
+        action,
+        ...params,
+      },
+    });
 
-  if (error) {
-    throw new Error(error.message || 'IPTV API error');
+    if (error) {
+      console.warn(`[IPTV] API error for action=${action}:`, error.message);
+      throw new Error(error.message || 'IPTV API error');
+    }
+
+    return data;
+  } catch (err) {
+    // Catch CORS/network errors that supabase client may throw
+    console.warn(`[IPTV] Network/CORS error for action=${action}:`, err);
+    throw err;
   }
+}
 
-  return data;
+// Build a proxied stream URL that goes through the HTTPS edge function
+export function buildProxyStreamUrl(directUrl: string): string {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  return `${supabaseUrl}/functions/v1/iptv?apikey=${anonKey}&streamUrl=${encodeURIComponent(directUrl)}`;
 }
 
 export async function testConnection(credentials: IPTVCredentials): Promise<{ success: boolean; userInfo?: IPTVUserInfo; serverInfo?: IPTVServerInfo; error?: string }> {
@@ -185,18 +199,21 @@ export async function getLiveStreams(credentials: IPTVCredentials, categoryId?: 
   return Array.isArray(data) ? data : [];
 }
 
-// Stream URL builders
+// Stream URL builders — returns direct URL; use buildProxyStreamUrl() to proxy through HTTPS
 export function buildVodStreamUrl(credentials: IPTVCredentials, streamId: number, extension: string): string {
   const baseUrl = credentials.serverUrl.replace(/\/$/, '');
-  return `${baseUrl}/movie/${credentials.username}/${credentials.password}/${streamId}.${extension}`;
+  const directUrl = `${baseUrl}/movie/${credentials.username}/${credentials.password}/${streamId}.${extension}`;
+  return buildProxyStreamUrl(directUrl);
 }
 
 export function buildSeriesStreamUrl(credentials: IPTVCredentials, streamId: number, extension: string): string {
   const baseUrl = credentials.serverUrl.replace(/\/$/, '');
-  return `${baseUrl}/series/${credentials.username}/${credentials.password}/${streamId}.${extension}`;
+  const directUrl = `${baseUrl}/series/${credentials.username}/${credentials.password}/${streamId}.${extension}`;
+  return buildProxyStreamUrl(directUrl);
 }
 
 export function buildLiveStreamUrl(credentials: IPTVCredentials, streamId: number): string {
   const baseUrl = credentials.serverUrl.replace(/\/$/, '');
-  return `${baseUrl}/${credentials.username}/${credentials.password}/${streamId}`;
+  const directUrl = `${baseUrl}/${credentials.username}/${credentials.password}/${streamId}`;
+  return buildProxyStreamUrl(directUrl);
 }
