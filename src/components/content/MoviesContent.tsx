@@ -396,6 +396,7 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
           onSelect={setSelectedContent}
           onInfo={setSelectedContent}
           onToggleList={toggleInList}
+          onNavigateLeft={focusSidebar}
         />
       )}
 

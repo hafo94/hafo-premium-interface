@@ -396,6 +396,7 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
           onSelect={setSelectedContent}
           onInfo={setSelectedContent}
           onToggleList={toggleInList}
+          onNavigateLeft={focusSidebar}
         />
       )}
 

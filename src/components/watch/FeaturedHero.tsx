@@ -10,9 +10,10 @@ interface FeaturedHeroProps {
   onSelect: (content: WatchContent) => void;
   onInfo: (content: WatchContent) => void;
   onToggleList: (id: string) => void;
+  onNavigateLeft?: () => void;
 }
 
-const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleList }: FeaturedHeroProps) => {
+const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleList, onNavigateLeft }: FeaturedHeroProps) => {
   const [focusedButton, setFocusedButton] = useState(0);
   const buttons = ['play', 'info', 'list'];
   const heroRef = useRef<HTMLDivElement>(null);
@@ -31,7 +32,11 @@ const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleL
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        setFocusedButton(prev => Math.max(prev - 1, 0));
+        if (focusedButton === 0 && onNavigateLeft) {
+          onNavigateLeft();
+        } else {
+          setFocusedButton(prev => Math.max(prev - 1, 0));
+        }
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
         setFocusedButton(prev => Math.min(prev + 1, buttons.length - 1));
@@ -49,7 +54,7 @@ const FeaturedHero = ({ content, isActive, isInList, onSelect, onInfo, onToggleL
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isActive, focusedButton, content, onSelect, onInfo, onToggleList]);
+  }, [isActive, focusedButton, content, onSelect, onInfo, onToggleList, onNavigateLeft]);
 
   return (
     <div ref={heroRef} className="relative w-full h-[70vh] min-h-[500px] max-h-[700px]">
