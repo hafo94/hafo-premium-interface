@@ -294,8 +294,8 @@ const ModeSidebar = ({ mode, activeItem, onItemSelect }: ModeSidebarProps) => {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        "fixed left-0 top-0 h-full z-40",
-        "flex flex-col pt-20 pb-8",
+        "fixed left-0 top-[68px] h-[calc(100%-68px)] z-30",
+        "flex flex-col pt-4 pb-8",
         "transition-all duration-300 ease-out",
         "bg-gradient-to-b from-background/80 via-background/60 to-background/80",
         "backdrop-blur-xl border-r border-border/20",
