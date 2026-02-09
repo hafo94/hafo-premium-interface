@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Play, Plus, Check, ThumbsUp, ChevronDown, ChevronUp, Volume2, ArrowLeft, Loader2 } from 'lucide-react';
 import { WatchContent, Season, Episode } from '@/data/watchContent';
 import { cn } from '@/lib/utils';
 import { useMovieDetails, useSeriesDetails } from '@/hooks/useTMDB';
 import { useToast } from '@/hooks/use-toast';
 import StreamPlayer from '@/components/player/StreamPlayer';
+import { useIPTVLibrary } from '@/hooks/useIPTVLibrary';
 
 interface ContentDetailProps {
   content: WatchContent;
@@ -14,6 +15,14 @@ interface ContentDetailProps {
 }
 
 const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDetailProps) => {
+  const { enrichWithIPTV, isLoading: iptvLoading } = useIPTVLibrary();
+
+  // Always enrich content with latest IPTV data so streamUrl is available
+  const iptvContent = useMemo(() => {
+    const enriched = enrichWithIPTV([content]);
+    return enriched[0] || content;
+  }, [content, enrichWithIPTV]);
+
   const [expandedSeason, setExpandedSeason] = useState<string | null>(
     content.seasons?.[0]?.id || null
   );
@@ -34,7 +43,14 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   const buttons = ['play', 'add', 'like', 'mute'];
 
   const handlePlay = () => {
-    if (!content.streamUrl) {
+    if (iptvLoading) {
+      toast({
+        title: "Loading IPTV catalog",
+        description: "Please wait while the catalog finishes loading...",
+      });
+      return;
+    }
+    if (!iptvContent.streamUrl) {
       toast({
         title: "No stream available",
         description: "This title is not available for streaming yet.",
@@ -110,7 +126,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
           <span className="text-sm font-medium">Back</span>
         </button>
         <StreamPlayer
-          streamUrl={content.streamUrl}
+          streamUrl={iptvContent.streamUrl}
           isPlaying={true}
           isMuted={false}
           className="flex-1"
