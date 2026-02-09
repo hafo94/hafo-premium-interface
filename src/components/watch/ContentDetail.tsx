@@ -115,7 +115,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   };
 
   // Fullscreen player overlay
-  if (isPlayerOpen && content.streamUrl) {
+  if (isPlayerOpen && iptvContent.streamUrl) {
     return (
       <div className="fixed inset-0 z-[60] bg-black flex flex-col">
         <button
