@@ -34,14 +34,6 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   const buttons = ['play', 'add', 'like', 'mute'];
 
   const handlePlay = () => {
-    if (!content.streamUrl) {
-      toast({
-        title: "No stream available",
-        description: "This content doesn't have a stream URL configured.",
-        variant: "destructive",
-      });
-      return;
-    }
     setIsPlayerOpen(true);
   };
 
@@ -99,7 +91,7 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   };
 
   // Fullscreen player overlay
-  if (isPlayerOpen && content.streamUrl) {
+  if (isPlayerOpen) {
     return (
       <div className="fixed inset-0 z-[60] bg-black flex flex-col">
         <button
