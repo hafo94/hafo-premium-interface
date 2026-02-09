@@ -2,13 +2,26 @@ import { useState, useCallback, useEffect } from "react";
 import { tvChannels, TVChannel, TVProgram, categoryLabels, getCategoryCount } from "@/data/tvChannels";
 import { useTVHomeChannels } from "@/hooks/useTVHomeChannels";
 import ChannelCard from "@/components/tv/ChannelCard";
-import TVPlayer from "@/components/tv/TVPlayer";
+import TVPlayer, { BrowserChannel } from "@/components/tv/TVPlayer";
 import ChannelListOverlay from "@/components/tv/ChannelListOverlay";
 import EPGGrid from "@/components/tv/EPGGrid";
 import TVHomeSettings from "@/components/tv/TVHomeSettings";
 import { SlidersHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useFocus } from "@/contexts/FocusContext";
+
+// Helper to convert legacy TVChannel to BrowserChannel for the player
+function toBrowserChannel(ch: TVChannel): BrowserChannel {
+  return {
+    id: typeof ch.id === 'string' ? parseInt(ch.id, 10) || 0 : ch.id as number,
+    name: ch.name,
+    icon: '',
+    category: ch.category || '',
+    streamUrl: '', // No real stream for hardcoded channels
+    epgId: '',
+    hasArchive: false,
+  };
+}
 
 interface TVContentProps {
   activeSection: string;
@@ -160,11 +173,15 @@ const TVContent = ({ activeSection }: TVContentProps) => {
     return (
       <>
         <TVPlayer
-          channel={selectedChannel}
+          channel={toBrowserChannel(selectedChannel)}
+          allChannels={visibleChannels.map(toBrowserChannel)}
           onOpenChannelList={() => setShowChannelList(true)}
           onOpenEPG={() => setShowEPG(true)}
           onBack={handleClosePlayer}
-          onChannelChange={handleChannelSelect}
+          onChannelChange={(bc) => {
+            const found = tvChannels.find(c => (typeof c.id === 'string' ? parseInt(c.id, 10) : c.id) === bc.id);
+            if (found) handleChannelSelect(found);
+          }}
         />
         <ChannelListOverlay
           isOpen={showChannelList}
