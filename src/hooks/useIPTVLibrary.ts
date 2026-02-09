@@ -22,12 +22,44 @@ function normalizeTitle(title: string): string {
     .trim();
 }
 
+/** Extract multiple normalized lookup keys from an IPTV title.
+ *  Handles patterns like "US| EN| The Dark Knight (2008)" */
+function extractCleanTitle(rawTitle: string): string[] {
+  const keys: string[] = [];
+
+  // Split by | and take the last segment (the actual title)
+  const parts = rawTitle.split('|');
+  const lastPart = parts[parts.length - 1].trim();
+
+  // Also try without year suffix: "Title (2021)" -> "Title"
+  const withoutYear = lastPart.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+
+  // Remove common tags like [HD], (HD), [EN], etc.
+  const withoutTags = withoutYear
+    .replace(/\[.*?\]/g, '')
+    .replace(/\((?:HD|SD|4K|UHD|EN|FHD)\)/gi, '')
+    .trim();
+
+  const normalized = normalizeTitle(lastPart);
+  const normalizedNoYear = normalizeTitle(withoutYear);
+  const normalizedClean = normalizeTitle(withoutTags);
+
+  keys.push(normalized);
+  if (normalizedNoYear !== normalized) keys.push(normalizedNoYear);
+  if (normalizedClean !== normalized && normalizedClean !== normalizedNoYear) keys.push(normalizedClean);
+
+  // Also add the full raw normalized (for titles without prefixes)
+  const fullNormalized = normalizeTitle(rawTitle);
+  if (!keys.includes(fullNormalized)) keys.push(fullNormalized);
+
+  return keys.filter(k => k.length > 0);
+}
+
 // Fetch all streams by iterating over categories in batches
 async function fetchAllVodByCategory(credentials: any): Promise<IPTVVodStream[]> {
   const categories: IPTVCategory[] = await getVodCategories(credentials);
   const all: IPTVVodStream[] = [];
   
-  // Fetch in batches of 5 categories at a time
   const batchSize = 5;
   for (let i = 0; i < categories.length; i += batchSize) {
     const batch = categories.slice(i, i + batchSize);
@@ -75,14 +107,17 @@ export function useIPTVLibrary() {
 
   const isLoading = vodLoading || seriesLoading;
 
-  // Build lookup maps by normalized title
+  // Build lookup maps by normalized title (multiple keys per entry)
   const vodMap = useMemo(() => {
     const map = new Map<string, IPTVVodStream>();
     if (!vodStreams) return map;
     for (const stream of vodStreams) {
-      map.set(normalizeTitle(stream.name), stream);
+      const keys = extractCleanTitle(stream.name);
+      for (const key of keys) {
+        map.set(key, stream);
+      }
     }
-    console.log(`[IPTV Library] VOD map built: ${map.size} titles`);
+    console.log(`[IPTV Library] VOD map built: ${vodStreams.length} streams → ${map.size} keys`);
     return map;
   }, [vodStreams]);
 
@@ -90,9 +125,12 @@ export function useIPTVLibrary() {
     const map = new Map<string, IPTVSeriesInfo>();
     if (!seriesList) return map;
     for (const series of seriesList) {
-      map.set(normalizeTitle(series.name), series);
+      const keys = extractCleanTitle(series.name);
+      for (const key of keys) {
+        map.set(key, series);
+      }
     }
-    console.log(`[IPTV Library] Series map built: ${map.size} titles`);
+    console.log(`[IPTV Library] Series map built: ${seriesList.length} series → ${map.size} keys`);
     return map;
   }, [seriesList]);
 
@@ -132,6 +170,7 @@ export function useIPTVLibrary() {
 
   const filterByIPTV = useMemo(() => {
     return (items: WatchContent[]): WatchContent[] => {
+      // Show all items while IPTV is still loading (don't block UI)
       if (!iptvCredentials || isLoading) return items;
       const enriched = enrichWithIPTV(items);
       return enriched.filter((item) => !!item.iptvId);
