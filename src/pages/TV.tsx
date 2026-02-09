@@ -1,76 +1,64 @@
-import { useState } from 'react';
-import { tvChannels, TVChannel, TVProgram } from '@/data/tvChannels';
+import { useState, useCallback } from 'react';
+import { useIPTVContext } from '@/contexts/IPTVContext';
+import { useLiveStreams } from '@/hooks/useIPTV';
+import { buildLiveStreamUrl } from '@/services/iptvService';
 import LiveTVHome from '@/components/tv/LiveTVHome';
-import TVPlayer from '@/components/tv/TVPlayer';
-import ChannelListOverlay from '@/components/tv/ChannelListOverlay';
-import EPGGrid from '@/components/tv/EPGGrid';
-import ChannelSettings from '@/components/tv/ChannelSettings';
+import TVPlayer, { BrowserChannel } from '@/components/tv/TVPlayer';
+import SettingsModal from '@/components/SettingsModal';
 
 type ViewMode = 'home' | 'player';
 
 const TV = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('home');
-  const [currentChannel, setCurrentChannel] = useState<TVChannel | null>(null);
-  const [showChannelList, setShowChannelList] = useState(false);
-  const [showEPG, setShowEPG] = useState(false);
+  const [currentChannel, setCurrentChannel] = useState<BrowserChannel | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const { iptvCredentials } = useIPTVContext();
+  const { data: streams } = useLiveStreams();
 
-  const handleChannelSelect = (channel: TVChannel) => {
+  // Build all channels for channel switching in player
+  const allChannels: BrowserChannel[] = (streams || []).map(s => ({
+    id: s.stream_id,
+    name: s.name,
+    icon: s.stream_icon || '',
+    category: s.category_id,
+    streamUrl: iptvCredentials ? buildLiveStreamUrl(iptvCredentials, s.stream_id) : '',
+    epgId: s.epg_channel_id || '',
+    hasArchive: s.tv_archive > 0,
+  }));
+
+  const handleChannelSelect = useCallback((channel: BrowserChannel) => {
     setCurrentChannel(channel);
     setViewMode('player');
-    setShowChannelList(false);
-    setShowEPG(false);
-  };
+  }, []);
 
-  const handleProgramSelect = (channel: TVChannel, program: TVProgram) => {
-    if (program.isLive) {
-      setCurrentChannel(channel);
-      setViewMode('player');
-      setShowEPG(false);
-    }
-  };
-
-  const handleBackToHome = () => {
+  const handleBackToHome = useCallback(() => {
     setViewMode('home');
     setCurrentChannel(null);
-  };
+  }, []);
 
   return (
     <>
       {viewMode === 'home' && (
         <LiveTVHome
           onChannelSelect={handleChannelSelect}
-          onViewAll={() => setShowSettings(true)}
-          onEditFavorites={() => setShowSettings(true)}
+          onOpenSettings={() => setShowSettings(true)}
         />
       )}
 
       {viewMode === 'player' && currentChannel && (
         <TVPlayer
           channel={currentChannel}
-          onOpenChannelList={() => setShowChannelList(true)}
-          onOpenEPG={() => setShowEPG(true)}
+          allChannels={allChannels}
+          onOpenChannelList={() => {}}
+          onOpenEPG={() => {}}
           onBack={handleBackToHome}
+          onChannelChange={handleChannelSelect}
         />
       )}
 
-      <ChannelListOverlay
-        isOpen={showChannelList}
-        onClose={() => setShowChannelList(false)}
-        onSelectChannel={handleChannelSelect}
-        currentChannel={currentChannel || undefined}
-      />
-
-      <EPGGrid
-        isOpen={showEPG}
-        onClose={() => setShowEPG(false)}
-        onSelectProgram={handleProgramSelect}
-        currentChannel={currentChannel || undefined}
-      />
-
-      <ChannelSettings
-        isOpen={showSettings}
-        onClose={() => setShowSettings(false)}
+      <SettingsModal
+        open={showSettings}
+        onOpenChange={setShowSettings}
       />
     </>
   );

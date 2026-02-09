@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Moon, Sun, Monitor, Bell, BellOff, Volume2, Eye, Palette, Wifi, Tv } from "lucide-react";
+import { Moon, Sun, Monitor, Bell, BellOff, Volume2, Eye, Palette, Wifi } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -10,7 +10,6 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import IPTVSettings from "@/components/settings/IPTVSettings";
-import KodiSettings from "@/components/settings/KodiSettings";
 
 interface SettingsModalProps {
   open: boolean;
@@ -47,7 +46,7 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
         </DialogHeader>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-4">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
             <TabsTrigger value="general" className="text-xs">
               <Palette className="w-3 h-3 mr-1.5" />
               General
@@ -55,10 +54,6 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
             <TabsTrigger value="iptv" className="text-xs">
               <Wifi className="w-3 h-3 mr-1.5" />
               IPTV
-            </TabsTrigger>
-            <TabsTrigger value="kodi" className="text-xs">
-              <Tv className="w-3 h-3 mr-1.5" />
-              Kodi
             </TabsTrigger>
           </TabsList>
 
@@ -212,9 +207,6 @@ const SettingsModal = ({ open, onOpenChange }: SettingsModalProps) => {
             <IPTVSettings />
           </TabsContent>
 
-          <TabsContent value="kodi" className="max-h-[60vh] overflow-y-auto pr-2">
-            <KodiSettings />
-          </TabsContent>
         </Tabs>
       </DialogContent>
     </Dialog>
