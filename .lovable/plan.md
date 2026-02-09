@@ -1,101 +1,54 @@
 
 
-# Fix IPTV Matching: Use TMDB ID Instead of Title
+# Fix Stream Playback: Two Bugs Preventing Video
 
-## The Problem
+## Bug 1: Player Never Opens (ContentDetail.tsx, line 118)
 
-Titles are not matching between IPTV and TMDB because title-based matching is inherently fragile. IPTV providers use names like `"US| EN| The Dark Knight (2008)"` while TMDB returns `"The Dark Knight"`. Even with our title normalization, slight differences cause mismatches.
+The fullscreen player render condition checks `content.streamUrl` (the original, unenriched prop which is always `undefined`) instead of `iptvContent.streamUrl` (the enriched version with the actual stream URL).
 
-## The Solution
+```
+// Current (broken):
+if (isPlayerOpen && content.streamUrl) {
 
-Both the IPTV data and our UI content already carry TMDB IDs:
-- IPTV VOD streams have a `tmdb_id` field (string)
-- IPTV Series have a `tmdb_id` field (string)
-- Our UI content (from TMDB) has `tmdbId` (number)
-
-We should match by TMDB ID first -- this is a guaranteed 1:1 match. Title matching becomes a fallback for the rare case where `tmdb_id` is missing from the IPTV data.
-
-## Changes
-
-### File: `src/hooks/useIPTVLibrary.ts`
-
-1. **Add TMDB ID lookup maps** alongside the existing title maps:
-   - `vodByTmdbId`: Map of TMDB ID string to `IPTVVodStream`
-   - `seriesByTmdbId`: Map of TMDB ID string to `IPTVSeriesInfo`
-
-2. **Update `enrichWithIPTV`** to check TMDB ID first, then fall back to title:
-   ```
-   For each TMDB item:
-     1. Look up by item.tmdbId in the TMDB ID map
-     2. If not found, fall back to title normalization lookup
-     3. If found by either method, set streamUrl + iptvId
-   ```
-
-3. **Add match rate logging** so we can verify how many titles are actually matching:
-   ```
-   [IPTV Library] Enriched 20 items: 14 matched by TMDB ID, 2 by title, 4 unmatched
-   ```
-
-## Technical Details
-
-### New maps in `useIPTVLibrary.ts`
-
-```typescript
-const vodByTmdbId = useMemo(() => {
-  const map = new Map<string, IPTVVodStream>();
-  if (!vodStreams) return map;
-  for (const stream of vodStreams) {
-    if (stream.tmdb_id) {
-      map.set(String(stream.tmdb_id), stream);
-    }
-    // Also try the 'tmdb' field some providers use
-    if (stream.tmdb) {
-      map.set(String(stream.tmdb), stream);
-    }
-  }
-  return map;
-}, [vodStreams]);
-
-const seriesByTmdbId = useMemo(() => {
-  const map = new Map<string, IPTVSeriesInfo>();
-  if (!seriesList) return map;
-  for (const series of seriesList) {
-    if (series.tmdb_id) {
-      map.set(String(series.tmdb_id), series);
-    }
-  }
-  return map;
-}, [seriesList]);
+// Fixed:
+if (isPlayerOpen && iptvContent.streamUrl) {
 ```
 
-### Updated matching in `enrichWithIPTV`
+This single-character fix is why the player never appears -- the condition is always false.
 
-```typescript
-return items.map((item) => {
-  if (item.type === 'movie') {
-    // Try TMDB ID first (reliable)
-    let vod = item.tmdbId ? vodByTmdbId.get(String(item.tmdbId)) : undefined;
-    // Fall back to title match
-    if (!vod) vod = vodMap.get(normalizeTitle(item.title));
-    if (vod) {
-      return { ...item, iptvId: vod.stream_id, streamUrl: buildVodStreamUrl(...) };
-    }
-  } else {
-    let series = item.tmdbId ? seriesByTmdbId.get(String(item.tmdbId)) : undefined;
-    if (!series) series = seriesMap.get(normalizeTitle(item.title));
-    if (series) {
-      return { ...item, iptvId: series.series_id, streamUrl: buildSeriesStreamUrl(...) };
-    }
-  }
-  return item;
-});
+## Bug 2: StreamPlayer Treats Proxy URL as HLS (StreamPlayer.tsx, line 44)
+
+The proxy URL format is:
+```
+https://dvhjyyjzxmbtvrfbbgcr.supabase.co/functions/v1/iptv?apikey=...&streamUrl=...
 ```
 
-## Summary
+The current HLS detection logic `!streamUrl.match(/\.\w{2,4}$/)` sees no file extension at the end of this URL (it ends with query params), so it assumes HLS and tries to load it via hls.js. But this is actually a direct video proxy that returns mp4/mkv data.
+
+**Fix**: Check the *original* stream URL (inside the `streamUrl` query param) for its extension, or detect that it's a proxy URL and treat it as direct video.
+
+The simplest approach: extract the inner URL's extension from the proxy URL to determine the content type, and only use HLS for actual `.m3u8` URLs.
+
+## Files to Modify
 
 | File | Change |
 |------|--------|
-| `src/hooks/useIPTVLibrary.ts` | Add TMDB ID maps, match by ID first then title fallback, add debug logging |
+| `src/components/watch/ContentDetail.tsx` | Line 118: change `content.streamUrl` to `iptvContent.streamUrl` |
+| `src/components/player/StreamPlayer.tsx` | Fix HLS detection to check for `.m3u8` explicitly rather than defaulting to HLS when no extension found |
 
-This is the minimal change needed. No edge function changes, no service layer changes -- just smarter matching on the client side using data we already have.
+## Technical Details
 
+### StreamPlayer HLS Detection Fix
+
+```typescript
+// Current (broken):
+const isHls = streamUrl.includes('.m3u8') || !streamUrl.match(/\.\w{2,4}$/);
+
+// Fixed - only treat as HLS if URL explicitly contains .m3u8:
+const isHls = streamUrl.includes('.m3u8');
+```
+
+This is safe because:
+- Real HLS streams always have `.m3u8` somewhere in the URL
+- Proxy URLs and direct mp4/mkv URLs should use the native `<video>` element
+- The proxy edge function already sets the correct `Content-Type` header
