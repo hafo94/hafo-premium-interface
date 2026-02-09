@@ -1,69 +1,61 @@
 
 
-# Content Detail Popup with In-Browser Playback
+# Fix Content Detail Popup Layout
 
-## Overview
+## Problem
 
-Update the existing `ContentDetail` modal to show enriched movie/series info (header image, runtime, rating, description, year, up to 3 actors) and replace the Kodi-based "Play" button with an in-browser `StreamPlayer` that opens fullscreen within the modal.
+When clicking a title, the ContentDetail modal opens but the backdrop image (set to `aspect-video` = 16:9 ratio) takes up nearly the entire modal viewport. The title, buttons, description, cast, and other info are either overlaid on the dark gradient at the bottom of the image (hard to see) or pushed below the fold in a tiny scrollable area.
 
-## Changes
+## Solution
 
-### 1. Update ContentDetail Modal (`src/components/watch/ContentDetail.tsx`)
+Reduce the hero/backdrop area height and restructure the layout so all key information is immediately visible without scrolling:
 
-The modal already exists and shows most required info. Changes needed:
+### Changes to `src/components/watch/ContentDetail.tsx`
 
-- **Show actors**: The `cast` field is already fetched from TMDB details (up to 5 names). Display the first 3 actors in the metadata section as "Cast: Actor 1, Actor 2, Actor 3"
-- **Show director** (for movies): Already available in `enrichedContent.director`
-- **Replace Kodi playback with StreamPlayer**: Remove the Kodi dependency. When "Play" is pressed, show the `StreamPlayer` component fullscreen inside the modal (or as a fullscreen overlay). The stream URL comes from `content.streamUrl` (for IPTV content) or shows a "No stream available" message for TMDB-only content
-- **Keep existing info**: Backdrop header image, title, year, runtime, rating (IMDb when available), genres, description, seasons/episodes, "More Like This"
+1. **Reduce backdrop height**: Replace `aspect-video` with a fixed max height (`h-[300px]` or `h-[35vh]`) so the image doesn't dominate the modal. This leaves ample room for the content info below.
 
-### 2. Add Fullscreen Player State to ContentDetail
+2. **Move key metadata above the fold**: Ensure the following are all visible without scrolling:
+   - Title and type badge (FILM/SERIES)
+   - Action buttons (Play, Add to List, Like)
+   - Year, runtime, rating, HD badge
+   - Description/plot text
+   - Cast (up to 3 actors)
+   - Director (for movies)
 
-When the user clicks "Play":
-- If `content.streamUrl` exists, transition the modal into a fullscreen player view using `StreamPlayer`
-- Show a back button to return to the detail view
-- Keyboard: Escape exits fullscreen player back to detail view, then Escape again closes the modal
+3. **Keep scrollable area** for longer content: seasons/episodes and "More Like This" remain in the scrollable section below.
 
-### 3. Ensure All Click Points Open ContentDetail
+### Layout Structure (top to bottom)
 
-Currently, clicking items in content rows and search results already calls `setSelectedContent()` which opens the modal. The hero's "Play" button also calls `onSelect(content)`. Verify all paths lead to the same `ContentDetail` popup:
-
-- **Hero "Play" button** -- currently calls `onSelect` which opens ContentDetail (already works)
-- **Hero "More Info" button** -- calls `onInfo` which also opens ContentDetail (already works)
-- **Content row items** -- calls `onItemSelect` -> `setSelectedContent` (already works)
-- **Search results** -- calls `onSelect` -> `setSelectedContent` (already works)
-
-No routing changes needed -- all paths already converge on the `ContentDetail` modal.
+```
++------------------------------------------+
+| Backdrop image (35vh max)                |
+| with gradient overlay                     |
+|   [X close button]                       |
+|   TYPE BADGE                             |
+|   TITLE                                  |
+|   [Play] [+] [Like]        [Volume]     |
++------------------------------------------+
+| Year | Runtime | Rating | HD             |
+| Description text...                      |
+| Cast: Actor 1, Actor 2, Actor 3         |
+| Director: Name (movies only)            |
++------------------------------------------+
+| Seasons & Episodes (scrollable)          |
+| More Like This (scrollable)             |
++------------------------------------------+
+```
 
 ## Technical Details
 
-### Cast Display (in metadata section)
-```
-Cast: Tom Hardy, Charlize Theron, Nicholas Hoult
-```
-Uses `enrichedContent.cast?.slice(0, 3).join(', ')` -- data already available from TMDB details fetch.
+### File: `src/components/watch/ContentDetail.tsx`
 
-### Player Integration
-Replace the Kodi `handlePlay` function with a state toggle:
-- `isPlayerOpen` state: when true, render `StreamPlayer` as a fullscreen overlay inside the modal
-- Stream URL: use `content.streamUrl` directly (no proxy needed for playback)
-- Controls: Space (play/pause), M (mute), F (fullscreen), Escape (back to detail)
+**Change 1 -- Backdrop sizing (line 128)**:
+- From: `<div className="relative aspect-video flex-shrink-0">`
+- To: `<div className="relative h-[300px] flex-shrink-0">`
 
-### Files Changed
+This caps the image area at 300px instead of letting it scale to 16:9 ratio of the full modal width, which at `max-w-3xl` (768px) would be ~432px -- over half the 90vh modal.
 
-| File | Change |
-|------|--------|
-| `src/components/watch/ContentDetail.tsx` | Add cast/director display, replace Kodi with StreamPlayer, add fullscreen player state |
+**Change 2 -- Ensure image covers the reduced area**:
+The `object-cover` class on the `<img>` already handles this, so the image will simply crop to fit the shorter container.
 
-### What the Popup Will Show
-
-1. **Header**: Full-width backdrop image with gradient overlay
-2. **Title**: Large title text with type badge (FILM / SERIES)
-3. **Metadata row**: Year, Runtime (formatted), Rating (IMDb preferred), HD badge
-4. **Cast**: "Cast: Actor 1, Actor 2, Actor 3" (max 3)
-5. **Director**: "Director: Name" (movies only)
-6. **Description**: Plot text
-7. **Action buttons**: Play, Add to List, Like, Mute
-8. **Seasons/Episodes**: For series (existing)
-9. **More Like This**: TMDB recommendations (existing)
-
+No other files need changes. The existing content (buttons, metadata, cast, director, description) is already coded correctly -- it's just being pushed out of view by the oversized backdrop.
