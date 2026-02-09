@@ -341,12 +341,12 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
     [setActiveZone, setContentIndex]
   );
 
-  // Determine loading state
-  const isLoading = iptvLoading || (isGridView
+  // Determine loading state (don't block on IPTV - it filters in background)
+  const isLoading = isGridView
     ? (activeSection === "popular" && popularLoading) ||
       (activeSection === "on-air" && onAirLoading) ||
       (isGenreSelected && genreLoading)
-    : homeLoading);
+    : homeLoading;
   const error = homeError;
 
   // Get section title

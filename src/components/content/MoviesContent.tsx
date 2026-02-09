@@ -342,12 +342,12 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
     [setActiveZone, setContentIndex]
   );
 
-  // Determine loading state
-  const isLoading = iptvLoading || (isGridView
+  // Determine loading state (don't block on IPTV - it filters in background)
+  const isLoading = isGridView
     ? (activeSection === "popular" && popularLoading) ||
       (activeSection === "cinema" && cinemaLoading) ||
       (isGenreSelected && genreLoading)
-    : homeLoading);
+    : homeLoading;
   const error = homeError;
 
   // Get section title
