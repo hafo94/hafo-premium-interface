@@ -60,10 +60,9 @@ serve(async (req) => {
       );
     }
 
-    const data = await response.json();
-
-    // For authentication check (no action or get_user_info), verify credentials
+    // For auth checks, parse JSON to validate credentials
     if (action === 'get_user_info' || action === 'authenticate') {
+      const data = await response.json();
       if (data.user_info && data.user_info.auth === 1) {
         return new Response(
           JSON.stringify({ 
@@ -81,10 +80,10 @@ serve(async (req) => {
       }
     }
 
-    return new Response(
-      JSON.stringify(data),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    // For large responses (streams lists), pass through the body directly without buffering
+    return new Response(response.body, {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
 
   } catch (error) {
     console.error('IPTV proxy error:', error);
