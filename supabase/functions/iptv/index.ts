@@ -145,9 +145,17 @@ serve(async (req) => {
 
     if (!response.ok) {
       console.error(`IPTV API Error: ${response.status} ${response.statusText}`);
+      // Always return 200 to the client so Supabase JS doesn't throw.
+      // Return empty array for list actions, error object for auth.
+      if (action === 'get_user_info' || action === 'authenticate') {
+        return new Response(
+          JSON.stringify({ success: false, error: `IPTV server error: ${response.status}` }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
       return new Response(
-        JSON.stringify({ error: `IPTV API error: ${response.status}` }),
-        { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify([]),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
