@@ -1,24 +1,32 @@
 import { useState } from "react";
-import { Wifi, WifiOff, Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Wifi, WifiOff, Loader2, CheckCircle, XCircle, Copy, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useIPTVContext } from "@/contexts/IPTVContext";
+import { useToast } from "@/hooks/use-toast";
 
 const IPTVSettings = () => {
   const { iptvCredentials, iptvConnected, setIPTVCredentials, testIPTV } = useIPTVContext();
-  
+  const { toast } = useToast();
+
   const [serverUrl, setServerUrl] = useState(iptvCredentials?.serverUrl || "");
   const [username, setUsername] = useState(iptvCredentials?.username || "");
   const [password, setPassword] = useState(iptvCredentials?.password || "");
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message: string } | null>(null);
+  const [testResult, setTestResult] = useState<{ success: boolean; message: string; statusCode?: number } | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
-  const handleSave = () => {
-    if (serverUrl && username && password) {
-      setIPTVCredentials({ serverUrl, username, password });
-      setTestResult(null);
-    }
+  const diagnosticUrl = serverUrl && username
+    ? `${serverUrl.replace(/\/$/, '')}/player_api.php?username=${encodeURIComponent(username)}&password=***&action=get_user_info`
+    : null;
+
+  const getStatusHint = (statusCode?: number) => {
+    if (!statusCode) return null;
+    if (statusCode === 404) return "404 = Wrong server URL or path. Check your provider's server address.";
+    if (statusCode === 401 || statusCode === 403) return "401/403 = Invalid username or password.";
+    if (statusCode === 0 || statusCode >= 500) return "Server unreachable. Check your server URL.";
+    return null;
   };
 
   const handleTest = async () => {
@@ -27,7 +35,6 @@ const IPTVSettings = () => {
       return;
     }
 
-    // Save first, then test
     setIPTVCredentials({ serverUrl, username, password });
     setIsTesting(true);
     setTestResult(null);
@@ -36,7 +43,10 @@ const IPTVSettings = () => {
       const result = await testIPTV();
       setTestResult({
         success: result.success,
-        message: result.success ? "Connected successfully!" : result.error || "Connection failed",
+        message: result.success
+          ? "Connected successfully!"
+          : result.error || "Connection failed",
+        statusCode: (result as any).statusCode,
       });
     } catch (error) {
       setTestResult({
@@ -54,6 +64,16 @@ const IPTVSettings = () => {
     setPassword("");
     setIPTVCredentials(null);
     setTestResult(null);
+  };
+
+  const handleCopyDiagnosticUrl = () => {
+    if (!diagnosticUrl) return;
+    // Copy with real password for actual testing
+    const fullUrl = serverUrl && username && password
+      ? `${serverUrl.replace(/\/$/, '')}/player_api.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&action=get_user_info`
+      : diagnosticUrl;
+    navigator.clipboard.writeText(fullUrl);
+    toast({ title: "Copied!", description: "Paste this URL in a browser tab to test your credentials directly." });
   };
 
   return (
@@ -118,18 +138,26 @@ const IPTVSettings = () => {
 
         {testResult && (
           <div
-            className={`flex items-center gap-2 p-3 rounded-lg text-sm ${
+            className={`space-y-1.5 p-3 rounded-lg text-sm ${
               testResult.success
                 ? "bg-green-500/10 text-green-500 border border-green-500/20"
                 : "bg-destructive/10 text-destructive border border-destructive/20"
             }`}
           >
-            {testResult.success ? (
-              <CheckCircle className="w-4 h-4 flex-shrink-0" />
-            ) : (
-              <XCircle className="w-4 h-4 flex-shrink-0" />
+            <div className="flex items-center gap-2">
+              {testResult.success ? (
+                <CheckCircle className="w-4 h-4 flex-shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 flex-shrink-0" />
+              )}
+              <span>{testResult.message}</span>
+              {testResult.statusCode && (
+                <span className="ml-auto font-mono text-xs opacity-70">HTTP {testResult.statusCode}</span>
+              )}
+            </div>
+            {getStatusHint(testResult.statusCode) && (
+              <p className="text-xs opacity-80 pl-6">{getStatusHint(testResult.statusCode)}</p>
             )}
-            <span>{testResult.message}</span>
           </div>
         )}
 
@@ -159,6 +187,44 @@ const IPTVSettings = () => {
             Clear
           </Button>
         </div>
+
+        {/* Diagnostics Panel */}
+        {serverUrl && (
+          <div className="pt-1">
+            <button
+              onClick={() => setShowDiagnostics(!showDiagnostics)}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              {showDiagnostics ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+              Advanced / Diagnostics
+            </button>
+
+            {showDiagnostics && (
+              <div className="mt-2 p-3 bg-secondary/30 rounded-lg space-y-2">
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">API Endpoint</p>
+                <div className="flex items-start gap-2">
+                  <code className="flex-1 text-xs text-foreground/70 break-all leading-relaxed font-mono bg-background/50 rounded p-2">
+                    {diagnosticUrl || "Fill in server URL and username above"}
+                  </code>
+                  {diagnosticUrl && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleCopyDiagnosticUrl}
+                      className="flex-shrink-0 h-7 px-2"
+                      title="Copy URL with real credentials to test in browser"
+                    >
+                      <Copy className="w-3 h-3" />
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Copy this URL (with your real password) and open it in a browser tab to verify your credentials work independently of this app.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
