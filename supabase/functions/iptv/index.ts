@@ -34,9 +34,13 @@ serve(async (req) => {
     console.log(`IPTV proxy_stream (GET): ${streamUrl.substring(0, 80)}...`);
 
     try {
-      const videoResponse = await fetch(streamUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      });
+      const rangeHeader = req.headers.get('Range');
+      const upstreamHeaders: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      };
+      if (rangeHeader) upstreamHeaders['Range'] = rangeHeader;
+
+      const videoResponse = await fetch(streamUrl, { headers: upstreamHeaders });
 
       if (!videoResponse.ok) {
         return new Response(`Stream fetch failed: ${videoResponse.status}`, {
@@ -47,10 +51,16 @@ serve(async (req) => {
 
       const contentType = videoResponse.headers.get('Content-Type') || 'video/mp4';
       const contentLength = videoResponse.headers.get('Content-Length');
-      const responseHeaders: Record<string, string> = { ...corsHeaders, 'Content-Type': contentType };
+      const contentRange = videoResponse.headers.get('Content-Range');
+      const responseHeaders: Record<string, string> = {
+        ...corsHeaders,
+        'Content-Type': contentType,
+        'Accept-Ranges': 'bytes',
+      };
       if (contentLength) responseHeaders['Content-Length'] = contentLength;
+      if (contentRange) responseHeaders['Content-Range'] = contentRange;
 
-      return new Response(videoResponse.body, { headers: responseHeaders });
+      return new Response(videoResponse.body, { status: videoResponse.status, headers: responseHeaders });
     } catch (error) {
       console.error('Stream proxy error:', error);
       return new Response('Stream proxy error', { status: 502, headers: corsHeaders });
@@ -71,9 +81,13 @@ serve(async (req) => {
 
       console.log(`IPTV proxy_stream: ${streamUrl.substring(0, 80)}...`);
 
-      const videoResponse = await fetch(streamUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
-      });
+      const rangeHeader = req.headers.get('Range');
+      const upstreamHeaders: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      };
+      if (rangeHeader) upstreamHeaders['Range'] = rangeHeader;
+
+      const videoResponse = await fetch(streamUrl, { headers: upstreamHeaders });
 
       if (!videoResponse.ok) {
         return new Response(
@@ -84,17 +98,18 @@ serve(async (req) => {
 
       const contentType = videoResponse.headers.get('Content-Type') || 'video/mp4';
       const contentLength = videoResponse.headers.get('Content-Length');
+      const contentRange = videoResponse.headers.get('Content-Range');
 
       const responseHeaders: Record<string, string> = {
         ...corsHeaders,
         'Content-Type': contentType,
+        'Accept-Ranges': 'bytes',
       };
-      if (contentLength) {
-        responseHeaders['Content-Length'] = contentLength;
-      }
+      if (contentLength) responseHeaders['Content-Length'] = contentLength;
+      if (contentRange) responseHeaders['Content-Range'] = contentRange;
 
       // Stream the video body directly — no buffering
-      return new Response(videoResponse.body, { headers: responseHeaders });
+      return new Response(videoResponse.body, { status: videoResponse.status, headers: responseHeaders });
     }
 
     // Regular API actions
@@ -115,6 +130,8 @@ serve(async (req) => {
       apiUrl += `&series_id=${encodeURIComponent(seriesId)}`;
     }
 
+    const maskedUrl = apiUrl.replace(encodeURIComponent(password), '***');
+    console.log(`IPTV Fetching: ${maskedUrl}`);
     console.log(`IPTV API Request: action=${action}, categoryId=${categoryId || 'none'}, seriesId=${seriesId || 'none'}`);
 
     // Add timeout to upstream fetch

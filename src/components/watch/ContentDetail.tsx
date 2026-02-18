@@ -43,6 +43,12 @@ const ContentDetail = ({ content, isInList, onToggleList, onClose }: ContentDeta
   const buttons = ['play', 'add', 'like', 'mute'];
 
   const handlePlay = () => {
+    console.log('[StreamDebug] Play clicked:', {
+      title: iptvContent.title,
+      iptvId: (iptvContent as any).iptvId,
+      streamUrl: iptvContent.streamUrl,
+      iptvLoading,
+    });
     if (iptvLoading) {
       toast({
         title: "Loading IPTV catalog",
