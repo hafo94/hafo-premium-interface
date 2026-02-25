@@ -35,8 +35,11 @@ export interface IPTVVodInfo {
   };
 }
 
-function buildApiUrl(credentials: IPTVCredentials, action: string, params: Record<string, string> = {}): string {
-  const baseUrl = credentials.serverUrl.replace(/\/$/, '');
+function buildApiUrl(credentials: IPTVCredentials, action: string, params: Record<string, string> = {}, forceHttps = false): string {
+  let baseUrl = credentials.serverUrl.replace(/\/$/, '');
+  if (forceHttps) {
+    baseUrl = baseUrl.replace(/^http:\/\//i, 'https://');
+  }
   const url = new URL(`${baseUrl}/player_api.php`);
   url.searchParams.set('username', credentials.username);
   url.searchParams.set('password', credentials.password);
@@ -48,43 +51,58 @@ function buildApiUrl(credentials: IPTVCredentials, action: string, params: Recor
 }
 
 async function directFetch<T>(credentials: IPTVCredentials, action: string, params: Record<string, string> = {}): Promise<T> {
-  const url = buildApiUrl(credentials, action, params);
+  const isHttpServer = credentials.serverUrl.startsWith('http://');
+  const isSecurePage = typeof window !== 'undefined' && window.location.protocol === 'https:';
   
-  try {
-    // Try direct fetch first (works from residential IPs)
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
-    
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    });
-    clearTimeout(timeout);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (directError) {
-    console.warn(`[IPTV Direct] Direct fetch failed for ${action}, falling back to proxy:`, directError);
-    
-    // Fallback to edge function proxy
-    const { data, error } = await supabase.functions.invoke('iptv', {
-      body: {
-        serverUrl: credentials.serverUrl,
-        username: credentials.username,
-        password: credentials.password,
-        action,
-        ...params,
-      },
-    });
-    
-    if (error) throw error;
-    return data as T;
+  // Strategy: If we're on HTTPS and server is HTTP, try HTTPS version first to avoid mixed content
+  const attempts: Array<{ label: string; url: string }> = [];
+  
+  if (isSecurePage && isHttpServer) {
+    // Try HTTPS first (avoids mixed content), then fall back to proxy
+    attempts.push({ label: 'HTTPS direct', url: buildApiUrl(credentials, action, params, true) });
+  } else {
+    // Server is already HTTPS or we're on HTTP - just try direct
+    attempts.push({ label: 'direct', url: buildApiUrl(credentials, action, params) });
   }
+  
+  for (const attempt of attempts) {
+    try {
+      console.log(`[IPTV Direct] Trying ${attempt.label} for ${action}`);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 20000);
+      
+      const response = await fetch(attempt.url, {
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      
+      if (!response.ok) {
+        console.warn(`[IPTV Direct] ${attempt.label} returned ${response.status} for ${action}`);
+        continue;
+      }
+      
+      const data = await response.json();
+      console.log(`[IPTV Direct] ${attempt.label} success for ${action}, data length: ${Array.isArray(data) ? data.length : 'object'}`);
+      return data;
+    } catch (err) {
+      console.warn(`[IPTV Direct] ${attempt.label} failed for ${action}:`, err);
+    }
+  }
+  
+  // Final fallback: edge function proxy
+  console.log(`[IPTV Direct] All direct attempts failed for ${action}, falling back to proxy`);
+  const { data, error } = await supabase.functions.invoke('iptv', {
+    body: {
+      serverUrl: credentials.serverUrl,
+      username: credentials.username,
+      password: credentials.password,
+      action,
+      ...params,
+    },
+  });
+  
+  if (error) throw error;
+  return data as T;
 }
 
 // --- Public API ---

@@ -256,7 +256,7 @@ serve(async (req) => {
 
     const maskedUrl = apiUrl.replace(encodeURIComponent(password), '***');
     console.log(`IPTV Fetching: ${maskedUrl}`);
-    console.log(`IPTV API Request: action=${action}, categoryId=${categoryId || 'none'}, seriesId=${seriesId || 'none'}`);
+    console.log(`IPTV API Request: action=${action}, categoryId=${categoryId || 'none'}, seriesId=${seriesId || 'none'}, vodId=${vodId || 'none'}`);
 
     // Add timeout to upstream fetch
     const controller = new AbortController();
@@ -284,10 +284,16 @@ serve(async (req) => {
     }
     clearTimeout(timeout);
 
+    console.log(`IPTV Response: status=${response.status}, statusText=${response.statusText}, action=${action}`);
+
     if (!response.ok) {
       console.error(`IPTV API Error: ${response.status} ${response.statusText}`);
+      // Try to read body for more info
+      try {
+        const errorBody = await response.text();
+        console.error(`IPTV Error body (first 500 chars): ${errorBody.substring(0, 500)}`);
+      } catch (_) {}
       // Always return 200 to the client so Supabase JS doesn't throw.
-      // Return empty array for list actions, error object for auth.
       if (action === 'get_user_info' || action === 'authenticate') {
         return new Response(
           JSON.stringify({ success: false, error: `IPTV server error: ${response.status}` }),
@@ -322,6 +328,7 @@ serve(async (req) => {
 
     // Read body as text (not stream) to avoid connection-closed crashes
     const text = await response.text();
+    console.log(`IPTV Response body length: ${text.length} chars for action=${action}`);
 
     // If response is too large, return empty array to avoid CORS crashes
     if (text.length > MAX_RESPONSE_SIZE) {
