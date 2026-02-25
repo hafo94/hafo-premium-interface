@@ -13,12 +13,15 @@ import { useInfinitePopularSeries, useInfiniteOnTheAirSeries, useInfiniteSeriesB
 import { Skeleton } from "@/components/ui/skeleton";
 import { getSeriesGenreLabel } from "@/data/genreConfig";
 import { useIPTVLibrary } from "@/hooks/useIPTVLibrary";
+import { useIPTVCatalogAvailable } from "@/hooks/useIPTVDirect";
+import IPTVSeriesContent from "@/components/content/IPTVSeriesContent";
 
 interface SeriesContentProps {
   activeSection: string;
 }
 
 const SeriesContent = ({ activeSection }: SeriesContentProps) => {
+  const { hasSeries: iptvHasSeries, isLoading: iptvCatalogLoading } = useIPTVCatalogAvailable();
   const { myList, toggleInList, isInList } = useMyList();
   const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
@@ -390,6 +393,11 @@ const SeriesContent = ({ activeSection }: SeriesContentProps) => {
         </div>
       </div>
     );
+  }
+
+  // If IPTV catalog is available, show IPTV-first view
+  if (iptvHasSeries && activeSection === "home") {
+    return <IPTVSeriesContent />;
   }
 
   return (

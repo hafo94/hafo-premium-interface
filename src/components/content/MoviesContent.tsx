@@ -13,6 +13,8 @@ import { useInfinitePopularMovies, useInfiniteNowPlayingMovies, useInfiniteMovie
 import { Skeleton } from "@/components/ui/skeleton";
 import { getMovieGenreLabel } from "@/data/genreConfig";
 import { useIPTVLibrary } from "@/hooks/useIPTVLibrary";
+import { useIPTVCatalogAvailable } from "@/hooks/useIPTVDirect";
+import IPTVMoviesContent from "@/components/content/IPTVMoviesContent";
 import { Loader2 } from "lucide-react";
 
 interface MoviesContentProps {
@@ -20,6 +22,7 @@ interface MoviesContentProps {
 }
 
 const MoviesContent = ({ activeSection }: MoviesContentProps) => {
+  const { hasMovies: iptvHasMovies, isLoading: iptvCatalogLoading } = useIPTVCatalogAvailable();
   const { myList, toggleInList, isInList } = useMyList();
   const { activeZone, contentIndex, setContentIndex, focusSidebar, focusHeader, setActiveZone } = useFocus();
   const isContentFocused = activeZone === "content";
@@ -391,6 +394,11 @@ const MoviesContent = ({ activeSection }: MoviesContentProps) => {
         </div>
       </div>
     );
+  }
+
+  // If IPTV catalog is available, show IPTV-first view
+  if (iptvHasMovies && activeSection === "home") {
+    return <IPTVMoviesContent />;
   }
 
   return (
