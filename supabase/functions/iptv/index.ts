@@ -14,6 +14,7 @@ interface IPTVRequest {
   action: string;
   categoryId?: string;
   seriesId?: string;
+  vodId?: string;
   streamUrl?: string; // For proxy_stream action
 }
 
@@ -68,7 +69,7 @@ serve(async (req) => {
   }
 
   try {
-    const { serverUrl, username, password, action, categoryId, seriesId, streamUrl }: IPTVRequest = await req.json();
+    const { serverUrl, username, password, action, categoryId, seriesId, vodId, streamUrl }: IPTVRequest = await req.json();
 
     // Handle proxy_stream action — streams video data through HTTPS
     if (action === 'proxy_stream') {
@@ -248,6 +249,9 @@ serve(async (req) => {
     }
     if (seriesId) {
       apiUrl += `&series_id=${encodeURIComponent(seriesId)}`;
+    }
+    if (vodId) {
+      apiUrl += `&vod_id=${encodeURIComponent(vodId)}`;
     }
 
     const maskedUrl = apiUrl.replace(encodeURIComponent(password), '***');
