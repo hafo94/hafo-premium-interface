@@ -25,8 +25,8 @@ const IPTV_STORAGE_KEY = 'iptv_credentials';
 const KODI_STORAGE_KEY = 'kodi_config';
 
 const DEFAULT_IPTV_CREDENTIALS: IPTVCredentials = {
-  serverUrl: 'http://freeiptv.ottc.xyz:80',
-  username: '850832714335',
+  serverUrl: 'http://cf.business-cdn-8k.su',
+  username: '3c5ff3e420f6',
   password: '641859008374',
 };
 
