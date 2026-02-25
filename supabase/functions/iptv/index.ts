@@ -112,6 +112,126 @@ serve(async (req) => {
       return new Response(videoResponse.body, { status: videoResponse.status, headers: responseHeaders });
     }
 
+    // Fetch M3U playlist and parse into structured JSON
+    if (action === 'fetch_m3u') {
+      if (!serverUrl || !username || !password) {
+        return new Response(
+          JSON.stringify({ error: 'Missing credentials for M3U fetch' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      const baseUrl = serverUrl.replace(/\/$/, '');
+      // Xtream M3U URL for VOD
+      const m3uType = streamUrl || 'vod'; // 'vod', 'series', 'live', or 'all'
+      
+      // Try multiple M3U URL formats
+      const m3uUrls = [
+        `${baseUrl}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=mpegts`,
+        `${baseUrl}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus&output=ts`,
+        `${baseUrl}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&type=m3u_plus`,
+        `${baseUrl}/get.php?username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+      ];
+
+      let m3uText = '';
+      let fetchSuccess = false;
+
+      for (const m3uUrl of m3uUrls) {
+        console.log(`IPTV fetch_m3u: trying ${m3uUrl.replace(encodeURIComponent(password), '***')}`);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
+
+        try {
+          const m3uResponse = await fetch(m3uUrl, {
+            signal: controller.signal,
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+          });
+          clearTimeout(timeout);
+
+          if (m3uResponse.ok) {
+            m3uText = await m3uResponse.text();
+            if (m3uText.includes('#EXTINF') || m3uText.includes('#EXTM3U')) {
+              fetchSuccess = true;
+              console.log(`M3U success with URL format, size: ${(m3uText.length / 1024).toFixed(1)}KB`);
+              break;
+            }
+            console.log(`M3U response not valid M3U format (${m3uText.substring(0, 100)})`);
+          } else {
+            console.log(`M3U URL returned ${m3uResponse.status}`);
+          }
+        } catch (e) {
+          clearTimeout(timeout);
+          console.log(`M3U URL failed: ${e}`);
+        }
+      }
+
+      if (!fetchSuccess) {
+        return new Response(
+          JSON.stringify({ error: 'All M3U URL formats failed', entries: [] }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Parse M3U into entries
+      const entries: Array<{
+        name: string;
+        stream_id: number;
+        stream_url: string;
+        stream_icon: string;
+        group_title: string;
+        tvg_id: string;
+        tvg_name: string;
+        type: string;
+      }> = [];
+
+      const lines = m3uText.split('\n');
+      let currentEntry: any = null;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.startsWith('#EXTINF:')) {
+          const groupMatch = line.match(/group-title="([^"]*)"/);
+          const logoMatch = line.match(/tvg-logo="([^"]*)"/);
+          const tvgIdMatch = line.match(/tvg-id="([^"]*)"/);
+          const tvgNameMatch = line.match(/tvg-name="([^"]*)"/);
+          const titleMatch = line.match(/,(.+)$/);
+
+          currentEntry = {
+            name: titleMatch ? titleMatch[1].trim() : '',
+            stream_icon: logoMatch ? logoMatch[1] : '',
+            group_title: groupMatch ? groupMatch[1] : '',
+            tvg_id: tvgIdMatch ? tvgIdMatch[1] : '',
+            tvg_name: tvgNameMatch ? tvgNameMatch[1] : '',
+          };
+        } else if (line.startsWith('http') && currentEntry) {
+          currentEntry.stream_url = line;
+
+          if (line.includes('/movie/')) {
+            currentEntry.type = 'movie';
+          } else if (line.includes('/series/')) {
+            currentEntry.type = 'series';
+          } else {
+            currentEntry.type = 'live';
+          }
+
+          const idMatch = line.match(/\/(\d+)\.\w+$/);
+          currentEntry.stream_id = idMatch ? parseInt(idMatch[1]) : 0;
+
+          if (m3uType === 'all' || currentEntry.type === m3uType) {
+            entries.push(currentEntry);
+          }
+          currentEntry = null;
+        }
+      }
+
+      console.log(`M3U parsed: ${entries.length} entries of type '${m3uType}' from ${lines.length} lines`);
+
+      return new Response(
+        JSON.stringify({ entries, total: entries.length }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Regular API actions
     if (!serverUrl || !username || !password || !action) {
       return new Response(
